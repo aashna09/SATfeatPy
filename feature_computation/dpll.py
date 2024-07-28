@@ -527,44 +527,45 @@ class DPLLProbing:
         """
 
         consistent = True
+        unit_clauses = self.sat_instance.unit_clauses
+        clause_states = self.sat_instance.clause_states
+        clauses = self.sat_instance.clauses
+        var_states = self.sat_instance.var_states
+        clause_lengths = self.sat_instance.clause_lengths
+        append_reduced_var = self.reduced_vars.append
 
-        # for each unit clause (if there are unit clauses)
-        while (len(self.sat_instance.unit_clauses) > 0) and consistent:
-            # get the next unit clause
-            clause_number = self.sat_instance.unit_clauses.pop()
+        while unit_clauses and consistent:
+            # Get the next unit clause
+            clause_number = unit_clauses.pop()
 
-            # skip inactive clauses
-            # print("cstate", self.feats.clause_states[clause_number])
-            if self.sat_instance.clause_states[clause_number] != ClauseState.ACTIVE: continue
-            # print("unit clause number", clause_number)
+            # Skip inactive clauses
+            if clause_states[clause_number] != ClauseState.ACTIVE:
+                continue
 
             lit_num = 0
+            clause = clauses[clause_number]
 
-            # while the current literal is not unassigned
-            # get the next possible unassigned literal
-            while (self.sat_instance.var_states[abs(self.sat_instance.clauses[clause_number][lit_num])] != VarState.UNASSIGNED):
+            # Find the first unassigned literal in the clause
+            while var_states[abs(clause[lit_num])] != VarState.UNASSIGNED:
                 lit_num += 1
 
-            assert self.sat_instance.clause_lengths[clause_number] == 1
+            assert clause_lengths[clause_number] == 1
 
-            # get the literal literal (excuse the pun)
-            literal = self.sat_instance.clauses[clause_number][lit_num]
+            # Get the literal and assign its value
+            literal = clause[lit_num]
+            var_index = abs(literal)
+            var_states[var_index] = VarState.TRUE_VAL if literal > 0 else VarState.FALSE_VAL
 
-            if literal > 0:
-                self.sat_instance.var_states[abs(literal)] = VarState.TRUE_VAL
-            else:
-                self.sat_instance.var_states[abs(literal)] = VarState.FALSE_VAL
-
-            self.reduced_vars.append(abs(literal))
+            append_reduced_var(var_index)
             self.sat_instance.num_active_vars -= 1
             num_vars_reduced += 1
 
-            # now reduce the clauses with that literal value
+            # Reduce the clauses with the assigned literal value
             r_consistent, num_clauses_reduced, num_vars_reduced = self.reduce_clauses(literal, num_clauses_reduced, num_vars_reduced)
-            # consistent = consistent and self.reduce_clauses(literal, num_clauses_reduced, num_vars_reduced)
             consistent = consistent and r_consistent
 
         return consistent, num_clauses_reduced, num_vars_reduced
+
 
     def backtrack(self):
         """
