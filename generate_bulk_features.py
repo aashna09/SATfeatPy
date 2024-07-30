@@ -10,6 +10,7 @@ def bulk_gen_features(path_to_cnfs="/projects/satdb/dataset_final/", results_csv
     # for each file, we need to create a sat_instance for it
     # file_list = glob.glob(path_to_cnfs + "sat_4*.cnf")
     file_list = glob.glob(path_to_cnfs + file_type + ".cnf")
+    print(file_list)
     dict_keys = ['c', 'v', 'clauses_vars_ratio', 'vars_clauses_ratio', 'vcg_var_mean', 'vcg_var_coeff', 'vcg_var_min',
      'vcg_var_max', 'vcg_var_entropy', 'vcg_clause_mean', 'vcg_clause_coeff', 'vcg_clause_min', 'vcg_clause_max',
      'vcg_clause_entropy', 'vg_mean', 'vg_coeff', 'vg_min', 'vg_max', 'pnc_ratio_mean', 'pnc_ratio_coeff',
@@ -26,7 +27,7 @@ def bulk_gen_features(path_to_cnfs="/projects/satdb/dataset_final/", results_csv
      'gsat_FirstLocalMinStep_CoeffVariance', 'gsat_FirstLocalMinStep_Median', 'gsat_FirstLocalMinStep_Q.10',
      'gsat_FirstLocalMinStep_Q.90', 'gsat_BestAvgImprovement_Mean', 'gsat_BestAvgImprovement_CoeffVariance',
      'gsat_FirstLocalMinRatio_Mean', 'gsat_FirstLocalMinRatio_CoeffVariance', 'gsat_EstACL_Mean',
-                 'vig_modularty',
+                 'recursive_estimate', 'weighted_backtrack_estimate', 'knuths_estimate','vig_modularty',
      'vig_d_poly', 'cvig_db_poly', 'variable_alpha', 'v_nd_p_node_min', 'v_nd_p_node_max', 'v_nd_p_node_mode',
      'v_nd_p_node_mean', 'v_nd_p_node_std', 'v_nd_p_node_zeros', 'v_nd_p_node_entropy', 'v_nd_p_node_q1',
      'v_nd_p_node_q2', 'v_nd_p_node_q3', 'v_nd_p_node_val_rate', 'v_nd_p_weights_min', 'v_nd_p_weights_max',
@@ -84,7 +85,7 @@ def bulk_gen_features(path_to_cnfs="/projects/satdb/dataset_final/", results_csv
         for i, file_name in enumerate(file_list):
             print(file_name)
             print("file ", i, " out of ", len(file_list))
-            sat_inst = SATInstance(file_name, preprocess=True)
+            sat_inst = SATInstance(file_name, preprocess=False)
             if sat_inst.solved:
                 continue
 
@@ -111,12 +112,12 @@ def bulk_gen_features(path_to_cnfs="/projects/satdb/dataset_final/", results_csv
 
 
 if __name__ == "__main__":
-    # path_to_cnfs = "cnf_examples/"
+    path_to_cnfs = "/home/ac72/SATfeatPy/cnf_examples/"
     classes = ["clique_", "colour_", "cliquecoloring", "dominating", "matching", "op", "php", "subsetcard", "tiling", "tseitin"]
     binary = ["sat", "unsat"]
-    path_to_cnfs = "/projects/satdb/dataset_final/"
-    file_type = binary[0] + "*" + classes[0] + "*"
-    results_csv = file_type + "_features.csv"
+    #pwdpath_to_cnfs = "/projects/satdb/dataset_final/"
+    file_type = "*"
+    results_csv = "features.csv"
 
     bulk_gen_features(path_to_cnfs=path_to_cnfs, results_csv=results_csv, file_type=file_type)
 

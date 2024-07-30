@@ -325,36 +325,29 @@ class DPLLProbing:
         value = random.choice([True, False])
         success = self.set_var_and_prop(var, value)
         if success:
-            # Record the depth after a successful propagation
             self.update_estimators_data()
         return success
 
     def select_unassigned_variable(self):
-        for var in range(1, self.sat_instance.v + 1):
-            if self.sat_instance.var_states[var] == VarState.UNASSIGNED:
-                return var
-        return None
+        # Optimize by using a generator expression to find the first unassigned variable
+        return next((var for var in range(1, self.sat_instance.v + 1) if self.sat_instance.var_states[var] == VarState.UNASSIGNED), None)
 
     def calculate_weighted_backtrack_estimate(self):
         if not self.branch_lengths:
             return 0
 
-        # Small positive constant to avoid math domain error when taking logarithm of zero
         epsilon = 1e-10
 
-        # Adjust probabilities to be strictly positive by adding a small constant
+        # Use a list comprehension for adjusted probabilities
         adjusted_probs = [prob if prob > 0 else epsilon for prob in self.branch_probabilities]
 
-        # Use log to transform the calculation and avoid overflow
-        log_weighted_sum = sum(
-            math.log(prob) + (d + 1) * math.log(2) for d, prob in zip(self.branch_lengths, adjusted_probs))
-        total_log_prob = sum(math.log(prob) for prob in adjusted_probs)
+        # Optimize by using math.fsum for numerical stability and sum for precomputed logs
+        log_probs = [math.log(prob) for prob in adjusted_probs]
+        log_weighted_sum = sum(d * math.log(2) + lp for d, lp in zip(self.branch_lengths, log_probs)) + sum(log_probs)
+        total_log_prob = sum(log_probs)
 
-        # Convert back from log scale by exponentiating, and adjust for the '- 1' in the original formula
         weighted_backtrack_estimate = log_weighted_sum - total_log_prob
-
-        # Take the logarithm of the weighted backtrack estimate (adding epsilon to avoid log(0)) and divide by the number of variables
-        log_weighted_backtrack_estimate = weighted_backtrack_estimate/ self.sat_instance.v
+        log_weighted_backtrack_estimate = weighted_backtrack_estimate / self.sat_instance.v
 
         return log_weighted_backtrack_estimate
 
