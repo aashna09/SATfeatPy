@@ -1,51 +1,49 @@
-# sys.path.append("/Users/bprovan/Insight/SAT-features/feature_computation")
-from feature_computation.enums import VarState, ClauseState
+# cython: language_level=3
 
-"""
-First we need to compute the active variables and clauses
-After pre-processing, active variable and clause computation is done
-Tautologies are removed, clauses are counted as passive and active, and variables marked as unassigned or irrelevant
-This information is used when probing, and performing unit propagation.
-"""
+from feature_computation.enums cimport VarState, ClauseState
+cimport cython
+from cython.view cimport array
 
 
-def get_active_features(sat_instance, clauses, c, v):
-
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def get_active_features(sat_instance, clauses, int c, int v):
     # initialize the lists that contain information on the clauses and variables
-    clause_states = [ClauseState.PASSIVE] * c
-    num_active_clauses_with_var = [0] * (v + 1)
-    num_bin_clauses_with_var = [0] * (v + 1)
-    clause_lengths = [0] * c
+    cdef int[:] clause_states = array(int, (c,))
+    cdef int[:] num_active_clauses_with_var = array(int, (v + 1,))
+    cdef int[:] num_bin_clauses_with_var = array(int, (v + 1,))
+    cdef int[:] clause_lengths = array(int, (c,))
 
     unit_clauses = []
 
     # These are used at some point...
-    num_unit_clauses = 0
-    num_binary_clauses = 0
-    num_ternary_clauses = 0
+    cdef int num_unit_clauses = 0
+    cdef int num_binary_clauses = 0
+    cdef int num_ternary_clauses = 0
 
     clauses_with_positive_var = []
     clauses_with_negative_var = []
 
-    for k in range(v+1):
+    cdef int k
+    for k in range(v + 1):
         clauses_with_positive_var.append([])
         clauses_with_negative_var.append([])
 
     # basically we want to remove literals if they appear twice
     # and remove the clause if it is a tautology (if variable both positive and negated appears in the clause)
 
-    # sort the clauses. Make it a set, to remove duplicates, and iterate pairwaise,
+    # sort the clauses. Make it a set, to remove duplicates, and iterate pairwise,
     # check if variables are negations, and if so we have a tautology
 
+    cdef int clause_i, i, j, num_literals, literal
     for clause_i in range(c):
-
         clause = clauses[clause_i]
         num_literals = len(clause)
         clause.sort(key=lambda x: abs(x))
 
         # mark and remove redundant literals
-        for i in range(num_literals -1):
-            j = i+1
+        for i in range(num_literals - 1):
+            j = i + 1
             if clause[i] == -clause[j]:
                 # we have a tautology
                 clauses[clause_i] = []
@@ -53,10 +51,9 @@ def get_active_features(sat_instance, clauses, c, v):
         # remove duplicates
         clause = list(set(clause))
         clauses[clause_i] = clause
-        # print(clause)
 
     # remove tautologies
-    clauses = [c for c in clauses if len(c) > 0]
+    clauses = [cl for cl in clauses if len(cl) > 0]
     num_active_clauses = len(clauses)
 
     # Clause is sorted in terms of literals, and duplicates have been removed
@@ -74,7 +71,6 @@ def get_active_features(sat_instance, clauses, c, v):
             unit_clauses.append(clause_i)
             num_unit_clauses += 1
         if num_literals == 2:
-
             for i in range(num_literals):
                 num_bin_clauses_with_var[abs(clause[i])] += 1
             num_binary_clauses += 1
@@ -84,24 +80,23 @@ def get_active_features(sat_instance, clauses, c, v):
         # now go through all literals in the clause, add number of active clauses with the variable
         # and mark the clauses with positive literals, and negative literals
         for literal in clause:
-
             if literal < 0:
                 clauses_with_negative_var[abs(literal)].append(clause_i)
             else:
-                clauses_with_positive_var[literal].append(clause_i)
+                clauses_with_positive_var[abs(literal)].append(clause_i)
 
             num_active_clauses_with_var[abs(literal)] += 1
 
     # filter out the ignored clauses
 
     # Now remove the redundant variables
-    num_active_vars = v
-    var_states = [VarState.UNASSIGNED] * (v+1)
+    cdef int num_active_vars = v
+    cdef int[:] var_states = array(int, (v + 1,))
 
     var_states[0] = VarState.IRRELEVANT
 
     # check if the variable is present in any clause
-    for i in range(1, v+1):
+    for i in range(1, v + 1):
         if num_active_clauses_with_var[i] == 0:
             var_states[i] = VarState.IRRELEVANT
             num_active_vars -= 1
@@ -114,16 +109,17 @@ def get_active_features(sat_instance, clauses, c, v):
     sat_instance.num_active_clauses = num_active_clauses
 
     sat_instance.clauses = clauses
-    sat_instance.clause_states = clause_states
+    sat_instance.clause_states = [ClauseState(state) for state in clause_states]
     sat_instance.clause_lengths = clause_lengths
     sat_instance.num_active_clauses_with_var = num_active_clauses_with_var
 
     sat_instance.num_bin_clauses_with_var = num_bin_clauses_with_var
     sat_instance.unit_clauses = unit_clauses
 
-    sat_instance.var_states = var_states
+    sat_instance.var_states = [VarState(state) for state in var_states]
     # all of the clauses that contain a positive version of this variable
     sat_instance.clauses_with_positive_var = clauses_with_positive_var
     sat_instance.clauses_with_negative_var = clauses_with_negative_var
 
-    return num_active_vars, num_active_clauses, clause_states, clauses, num_bin_clauses_with_var, var_states
+    return (num_active_vars, num_active_clauses, clause_states, clauses,
+            num_bin_clauses_with_var, var_states)

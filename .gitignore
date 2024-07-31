@@ -5,3 +5,14 @@ cpp_code/features
 features.json
 features.csv
 SAT-features/cpp_code/
+# Ignore Cython-generated C files
+build/
+feature_computation/*.c
+feature_computation/*.so
+feature_computation/*.pyd
+# My temp generated files
+counting_benchmarks/
+results/
+results_counting_benchmarks/
+generate_report*.py
+total_time_comparison.png
