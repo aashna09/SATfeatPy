@@ -1,27 +1,36 @@
+# cython: language_level=3
+
 import statistics as stats
 import math
 import scipy.stats as sci_stats
+cimport cython
+import numpy as np
+cimport numpy as np
+
 """
 File to control the computation and aggregation of statistics for lists of values.
 """
 
-
-def get_stats(l):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def get_stats(list l):
     """
     Gets the four basic stats used for most features
     :param l: List to generate statistics from.
     :return: mean, co-efficient of variation, minimum and maximum.
     """
-    mean = stats.mean(l)
-    min_val = min(l)
-    max_val = max(l)
-    std = stats.pstdev(l)
-    coefficient_of_variation = calc_coefficient_of_variation(mean, std)
+    cdef double mean = stats.mean(l)
+    cdef double min_val = min(l)
+    cdef double max_val = max(l)
+    cdef double std = stats.pstdev(l)
+    cdef double coefficient_of_variation = calc_coefficient_of_variation(mean, std)
 
     return mean, coefficient_of_variation, min_val, max_val
 
 
-def get_stdev(l):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def get_stdev(list l):
     """
     :param l: data
     :return: Population standard deviation
@@ -29,7 +38,9 @@ def get_stdev(l):
     return stats.pstdev(l)
 
 
-def calc_coefficient_of_variation(mean, std):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def calc_coefficient_of_variation(double mean, double std):
     """
     The coefficient of variation is a statistical measure of the relative dispersion of data points in a data series
     around the mean. https://en.wikipedia.org/wiki/Coefficient_of_variation
@@ -43,54 +54,56 @@ def calc_coefficient_of_variation(mean, std):
         return std / mean
 
 
-def scipy_entropy_discrete(l, num_outcomes):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def scipy_entropy_discrete(list l, int num_outcomes):
     """
     Create a probability distribution of l, and then get the entropy of that distribution
     :param l: Data
     :param num_outcomes: The total possible number of outcomes
     :return: Entropy of l
     """
-    p = [0] * num_outcomes
+    cdef np.ndarray[int, ndim=1] p = np.zeros(num_outcomes, dtype=np.int32)
+    cdef int elem
+    cdef double entropy
 
     for elem in l:
         p[elem] += 1
 
-    p = [x/len(l) for x in p]
-
+    p = p / len(l)
     entropy = sci_stats.entropy(pk=p)
     return entropy
 
 
-def scipy_entropy_continous(l, buckets=100):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def scipy_entropy_continous(list l, int buckets=100):
     """
-        Create a probability distribution of l, and then get the entropy of that distribution
-        :param l: Data
-        :return: Entropy of l
-        """
-
-    maxval = 1
-    # set up probability distribution with number of buckets
-    p = [0] * buckets
+    Create a probability distribution of l, and then get the entropy of that distribution
+    :param l: Data
+    :return: Entropy of l
+    """
+    cdef np.ndarray[int, ndim=1] p = np.zeros(buckets, dtype=np.int32)
+    cdef int index, x
+    cdef double entropy
+    cdef double maxval = 1.0
 
     for x in l:
         index = math.floor(x * (buckets / maxval))
-
         if index >= buckets:
-            index = buckets -1
+            index = buckets - 1
         if index < 0:
             index = 0
-
         p[index] += 1
 
-    # normalise
-    p = [x / len(l) for x in p]
-
+    p = p / len(l)
     entropy = sci_stats.entropy(pk=p)
-
     return entropy
 
 # Legacy
-def entropy_float_array(l, num, vals, maxval):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def entropy_float_array(list l, int num, int vals, double maxval):
     """
     :param l: list of values (float, should be between 0 and 1)
     :param vals: size of the bins used (normally 100)
@@ -103,68 +116,47 @@ def entropy_float_array(l, num, vals, maxval):
     writeFeature("POSNEG-RATIO-CLAUSE-entropy",array_entropy(pos_frac_in_clause,numClauses,100,1));
     https://en.wikipedia.org/wiki/Entropy_(information_theory)
     """
+    cdef np.ndarray[int, ndim=1] p = np.zeros(vals + 1, dtype=np.int32)
+    cdef double entropy = 0.0
+    cdef int index, t
 
-    # seems to be off by 1 error in the sat implementation... you shouldn't need 101 buckets...
-    p = [0] * (vals + 1)
-
-    res = 0
-    entropy = 0
-
-    # based on the assumption that all values in l are floats between 0 and 1
-
-    # set up the probability distribution distribution
     for t in range(num):
-        # if l[t] == reserved_value ?:
-        #   res ++
-        #     continue
-
-        # find the bucket it should go in
-        # index = math.floor(l[t] / (maxval/vals))
-        index = math.floor(l[t] * (vals/maxval))
-
+        index = math.floor(l[t] * (vals / maxval))
         if index > vals:
             index = vals
         if index < 0:
             index = 0
-
         p[index] += 1
 
-    for t in range(vals+1):
+    for t in range(vals + 1):
         if p[t] != 0:
-            # pval = p[t]/(num-res)
-            pval = p[t]/num
+            pval = p[t] / num
             entropy += pval * math.log(pval)
 
     return -1 * entropy
 
 
-def entropy_int_array(l,number_of_outcomes):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def entropy_int_array(list l, int number_of_outcomes):
     """
     :param l: List of statistics (vcg variable/clause node degrees, )
     :param number_of_outcomes: upper bound on the maximum number of outcomes (e.g. for vcg clause node degree, it could have a maximum
     of the number of variables (the clauses contains all variables)).
     :return:
-
     vcg clause entropy = array_entropy(clause_array,numClauses,numActiveVars+1))
-
     Entropy of x  is H(X) = - sum (P(xi) * log(P(xi)))
     """
+    cdef np.ndarray[int, ndim=1] p = np.zeros(number_of_outcomes, dtype=np.int32)
+    cdef double entropy = 0.0
+    cdef int elem, t
 
-    # create the distribution buckets
-    p = [0] * number_of_outcomes
-    # res = 0
-    entropy = 0
-
-    # set up the probability distribution
-    # Could also be in range of the list
     for elem in l:
         p[elem] += 1
 
     for t in range(number_of_outcomes):
         if p[t] != 0:
-            pval = p[t]/len(l)
-            # pval = p[t]/(num - res)
+            pval = p[t] / len(l)
             entropy += pval * math.log(pval)
 
     return -1 * entropy
-
