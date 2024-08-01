@@ -1,6 +1,12 @@
+# cython: language_level=3
 
+cimport cython
+from cpython cimport array
+from libc.math cimport abs
 
-def compute_balance_features(clauses, c, v):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def compute_balance_features(list clauses, int c, int v):
     """
     Computes the balance features
     :param clauses: List of clauses of the cnf
@@ -8,23 +14,21 @@ def compute_balance_features(clauses, c, v):
     :param v: number of variables
     :return:
     """
-
-    variables_pos_count = [0] * v
-    variables_neg_count = [0] * v
-    pos_neg_variable_ratios = []
-    pos_neg_variable_balance = []
-    # positive and negative counts of variables (literal instances)
-
-    pos_neg_clause_ratios = []
-    pos_neg_clause_balance = []
-    num_horn_clauses = 0
-    num_binary_clauses = 0
-    num_ternary_clauses = 0
-
-    horn_clause_variable_count = [0] * v
+    cdef int[:] variables_pos_count = array.array('i', [0] * v)
+    cdef int[:] variables_neg_count = array.array('i', [0] * v)
+    cdef double[:] pos_neg_variable_ratios = array.array('d', [])
+    cdef double[:] pos_neg_variable_balance = array.array('d', [])
+    cdef double[:] pos_neg_clause_ratios = array.array('d', [])
+    cdef double[:] pos_neg_clause_balance = array.array('d', [])
+    cdef int num_horn_clauses = 0
+    cdef int num_binary_clauses = 0
+    cdef int num_ternary_clauses = 0
+    cdef int[:] horn_clause_variable_count = array.array('i', [0] * v)
+    
+    cdef int pos, neg, literal, i
+    cdef double ratio
 
     for clause in clauses:
-
         if len(clause) == 2:
             num_binary_clauses += 1
         if len(clause) == 3:
@@ -37,35 +41,30 @@ def compute_balance_features(clauses, c, v):
             if literal < 0:
                 neg += 1
                 literal = abs(literal)
-
                 variables_neg_count[literal - 1] += 1
-
             else:
                 pos += 1
                 variables_pos_count[literal - 1] += 1
 
         if neg == 0:
-            ratio = 1
+            ratio = 1.0
         else:
             ratio = pos / neg
         pos_neg_clause_ratios.append(ratio)
-
         pos_neg_clause_balance.append(2.0 * abs(0.5 - (pos / (pos + neg))))
 
         # clause is a horn clause if it has at most 1 positive literal
         if pos <= 1:
             num_horn_clauses += 1
-
             for literal in clause:
                 horn_clause_variable_count[abs(literal) - 1] += 1
 
-    # calculate the ratio of positive and negative literals
-    # per variable
+    # calculate the ratio of positive and negative literals per variable
     for i in range(v):
         pos_instances = variables_pos_count[i]
         neg_instances = variables_neg_count[i]
         if neg_instances == 0:
-            vi_ratio = 1
+            vi_ratio = 1.0
         else:
             vi_ratio = pos_instances / neg_instances
 
