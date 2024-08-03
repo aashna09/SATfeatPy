@@ -6,7 +6,11 @@ extensions = [
     Extension("feature_computation.active_features", ["feature_computation/active_features.pyx"]),
     Extension("feature_computation.enums", ["feature_computation/enums.pyx"]),
     Extension("feature_computation.array_stats", ["feature_computation/array_stats.pyx"], include_dirs=[np.get_include()]),
-    Extension("feature_computation.balance_features", ["feature_computation/balance_features.pyx"])
+    Extension("feature_computation.balance_features", ["feature_computation/balance_features.pyx"]),
+    Extension("feature_computation.base_features", ["feature_computation/base_features.pyx"]),
+    Extension("feature_computation.preprocessing", ["feature_computation/preprocessing.pyx"], ["c"],
+    ),
+
 ]
 
 setup(
