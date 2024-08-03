@@ -1,7 +1,8 @@
+# cython: language_level=3
+
 import os
 
-
-def local_search_probe(cnf_file, saps=True, gsat=True):
+def local_search_probe(str cnf_file, bint saps=True, bint gsat=True):
     """
     Perform the local search probing with SAPS and GSAT algorithms, via ubcsat.
     :param cnf_file:
@@ -27,8 +28,9 @@ def local_search_probe(cnf_file, saps=True, gsat=True):
     if not os.path.isdir("results/"):
         os.mkdir("results")
 
-    args_list = []
+    cdef list args_list = []
     args_list.append("./ubcsat/ubcsat_linux")
+
     # add file instance to probe
     args_list.append("-inst")
     args_list.append(cnf_file)
@@ -40,35 +42,29 @@ def local_search_probe(cnf_file, saps=True, gsat=True):
     # set up statistics used as features
     args_list.append("-r stats")
     temp_fn = os.popen("mktemp /tmp/sapsgsat-XXXX").read().strip("\n")
-    # args_list.append("ubcsat/results/out.txt")
     args_list.append(temp_fn)
     args_list.append("best[mean+cv],firstlmstep[mean+median+cv+q10+q90],bestavgimpr[mean+cv],firstlmratio[mean+cv],estacl")
     # this file gets overwritten every time, probably useful to look into temporary files in the future
 
     # number of runs of each algorithm
     num_runs = "10000"
-
     args_list.append("-runs")
     args_list.append(num_runs)
-
     timelimit = "2"
     args_list.append("-gtimeout")
     args_list.append(timelimit)
-
     args_list.append("-r out null")
-    saps_res_dict = {}
-    gsat_res_dict = {}
+    cdef dict saps_res_dict = {}
+    cdef dict gsat_res_dict = {}
 
     if saps:
         # run the saps algorithm
         args_list.append("-alg")
         args_list.append("saps")
-
         command = " ".join(args_list)
         # print(command)
         # run saps
         os.system(command)
-
         saps_res_dict = read_ubcsat_results(True, temp_fn)
 
     if gsat:
@@ -81,25 +77,25 @@ def local_search_probe(cnf_file, saps=True, gsat=True):
 
     return saps_res_dict, gsat_res_dict
 
-
-def read_ubcsat_results(saps, temp_fn):
+def read_ubcsat_results(bint saps, str temp_fn):
     """
     Read the results of the ubcsat saps or gsat runs, and put them into a dictionary
     :param saps:
     :return:
     """
+    cdef str prefix
     if saps:
         prefix = "saps_"
     else:
         prefix = "gsat_"
-    res_dict = {}
+    
+    cdef dict res_dict = {}
     with open(temp_fn) as f:
         for line in f:
             line.strip("\n")
             res = line.split(" = ")
             if len(res) > 1:
-                # print(res)
                 res_dict[prefix + res[0]] = float(res[1])
 
-    assert(len(res_dict) == 12)
+    assert len(res_dict) == 12
     return res_dict

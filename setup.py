@@ -8,9 +8,10 @@ extensions = [
     Extension("feature_computation.array_stats", ["feature_computation/array_stats.pyx"], include_dirs=[np.get_include()]),
     Extension("feature_computation.balance_features", ["feature_computation/balance_features.pyx"]),
     Extension("feature_computation.base_features", ["feature_computation/base_features.pyx"]),
-    Extension("feature_computation.preprocessing", ["feature_computation/preprocessing.pyx"], ["c"],
-    ),
-
+    Extension("feature_computation.preprocessing", ["feature_computation/preprocessing.pyx"], ["c"]),
+    Extension("feature_computation.parse_cnf", ["feature_computation/parse_cnf.pyx"],),
+    Extension("feature_computation.local_search_probing", ["feature_computation/local_search_probing.pyx"],),
+    Extension("feature_computation.graph_features", ["feature_computation/graph_features.pyx"],),
 ]
 
 setup(
