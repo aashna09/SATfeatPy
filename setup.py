@@ -12,6 +12,8 @@ extensions = [
     Extension("feature_computation.parse_cnf", ["feature_computation/parse_cnf.pyx"],),
     Extension("feature_computation.local_search_probing", ["feature_computation/local_search_probing.pyx"],),
     Extension("feature_computation.graph_features", ["feature_computation/graph_features.pyx"],),
+    # Extension("feature_computation.stopwatch", ["feature_computation/stopwatch.pyx"],),
+    Extension("feature_computation.dpll", ["feature_computation/dpll.pyx"],),
 ]
 
 setup(
