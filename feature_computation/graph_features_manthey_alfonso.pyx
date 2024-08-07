@@ -1,9 +1,16 @@
-import networkx as nx
+# cython: language_level=3
+import cython
 import numpy as np
 from scipy import stats
+cimport numpy as cnp
+from libc.stdlib cimport malloc, free
 
+# Import NetworkX as a Python module since it cannot be compiled by Cython
+import networkx as nx
 
-def create_vcg(clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple create_vcg(list clauses):
     """
     Create VCG
     Variable-Clause Graph features
@@ -18,6 +25,8 @@ def create_vcg(clauses):
 
     # Node for each variable
     # node for each clause
+    cdef int i, literal, degree
+    cdef str c_node, v_node
 
     for i, clause in enumerate(clauses):
         c_node = "c_" + str(i)
@@ -30,10 +39,10 @@ def create_vcg(clauses):
                 v_node = "v_" + str(literal)
                 vcgneg.add_edge(c_node, v_node)
 
-    v_node_degrees_pos = []
-    v_node_degrees_neg = []
-    c_node_degrees_pos = []
-    c_node_degrees_neg = []
+    cdef list v_node_degrees_pos = []
+    cdef list v_node_degrees_neg = []
+    cdef list c_node_degrees_pos = []
+    cdef list c_node_degrees_neg = []
 
     # get node statistics
     for i in vcgpos.nodes():
@@ -53,8 +62,9 @@ def create_vcg(clauses):
 
     return v_node_degrees_pos, v_node_degrees_neg, c_node_degrees_pos, c_node_degrees_neg
 
-
-def create_vg(clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple create_vg(list clauses):
     """
     A variable graph (VG) has a node for each variable, and an edge between variables that occur together in at least
     one clause
@@ -65,9 +75,13 @@ def create_vg(clauses):
 
     # for each literal in a clause, for all the other literals in that clause and the weight for each edge
     vg = nx.Graph()
+    cdef int k, i, j, degree
+    cdef str v_node_i, v_node_j
+    cdef list node_degrees = []
+    cdef list weights = []
+    cdef tuple weight_tuple
 
     for k, clause in enumerate(clauses):
-
         for i in range(len(clause)):
             k = 0
             for j in range(i + 1, len(clause)):
@@ -76,19 +90,17 @@ def create_vg(clauses):
                 k += 1
                 vg.add_edge(v_node_i, v_node_j, weight=pow(2, -k))
 
-    node_degrees = []
-    weights = []
-
     for n in vg.nodes:
         degree = len(nx.edges(vg, n))
         node_degrees.append(degree)
-        for weight in vg.edges.data("weight", n):
-            weights.append(weight[2])
+        for weight_tuple in vg.edges.data("weight", n):
+            weights.append(weight_tuple[2])
 
     return node_degrees, weights
 
-
-def create_cg(clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple create_cg(list clauses):
     """
     A clause graph (CG) has a node for each clause, and an edge between clauses that have the same literal
 
@@ -97,8 +109,12 @@ def create_cg(clauses):
     """
 
     cg = nx.Graph()
-
-    c_node = []
+    cdef list c_node = []
+    cdef int i, literal, j, weight, degree
+    cdef str c_n
+    cdef list node_degrees = []
+    cdef list weights = []
+    cdef tuple weight_tuple
 
     for i, clause in enumerate(clauses):
         c_n = "c_" + str(i)
@@ -112,19 +128,18 @@ def create_cg(clauses):
                     weight += 1
                     cg.add_edge(c_node[i], c_node[i + 1 + j], weight=weight)
 
-    node_degrees = []
-    weights = []
-
     for n in cg.nodes:
         degree = len(nx.edges(cg, n))
-        for weight in cg.edges.data("weight", n):
-            weights.append(weight[2])
+        for weight_tuple in cg.edges.data("weight", n):
+            weights.append(weight_tuple[2])
         node_degrees.append(degree)
 
     return node_degrees, weights
 
 
-def create_rg(clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple create_rg(list clauses):
     """
     A resolution graph (RG) has a node for each clause, and an edge between clauses if they produce a
     non-tautological resolvent
@@ -132,10 +147,14 @@ def create_rg(clauses):
     :param clauses:
     :return: The degree of each node in the variable graph and the weight for each edge
     """
-
     rg = nx.Graph()
-
-    c_node = []
+    cdef list c_node = []
+    cdef int i, j, k, degree
+    cdef str c_n
+    cdef list node_degrees = []
+    cdef list weights = []
+    cdef int weight
+    cdef tuple weight_tuple
 
     for i, clause in enumerate(clauses):
         c_n = "c_" + str(i)
@@ -148,19 +167,17 @@ def create_rg(clauses):
                 weight = pow(2, -(k - 2))
                 rg.add_edge(c_node[i], c_node[i + 1 + j], weight=weight)
 
-    node_degrees = []
-    weights = []
-
     for n in rg.nodes:
         degree = len(nx.edges(rg, n))
-        for weight in rg.edges.data("weight", n):
-            weights.append(weight[2])
+        for weight_tuple in rg.edges.data("weight", n):
+            weights.append(weight_tuple[2])
         node_degrees.append(degree)
 
     return node_degrees, weights
 
-
-def create_big(clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple create_big(list clauses):
     """
     A binary implication graph (BIG) it's a directed graph that has a node for each literal, and an edge if
     there's an implication between the literals
@@ -168,8 +185,13 @@ def create_big(clauses):
     :param clauses:
     :return: The degree of each node in the variable graph and the weight of each edge
     """
-
     big = nx.DiGraph()
+    cdef int k, i, degree
+    cdef str v_node1, v_node2
+    cdef int a, b
+    cdef list node_degrees = []
+    cdef list weights = []
+    cdef tuple weight_tuple
 
     for k, clause in enumerate(clauses):
         for i in range(len(clause)):
@@ -185,35 +207,39 @@ def create_big(clauses):
             big.add_edge('v_' + str(-a), 'v_' + str(b), weight=1)
             big.add_edge('v_' + str(-b), 'v_' + str(a), weight=1)
 
-    node_degrees = []
-    weights = []
-
     for n in big.nodes:
         degree = len(nx.edges(big, n))
-        for weight in big.edges.data("weight", n):
-            weights.append(weight[2])
+        for weight_tuple in big.edges.data("weight", n):
+            weights.append(weight_tuple[2])
         node_degrees.append(degree)
 
     return big, node_degrees, weights
 
-
-def neighbors_nodes(l, clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef neighbors_nodes(int l, list clauses):
     big, _, _ = create_big(clauses)
-    neighbors = big.neighbors('v_' + str(l))
+    cdef list neighbors = big.neighbors('v_' + str(l))
     return neighbors
 
-
-def create_exo_and_band(clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple create_exo_and_band(list clauses):
     """
         Full-AND, Blocked-AND and Exactly One Constraint Graphs
 
         :param clauses:
         :return: The degree of each node in the variable graph and the weight of each edge
     """
-
     andg = nx.Graph()
     bandg = nx.Graph()
     exog = nx.Graph()
+    cdef int k, i, degree
+    cdef str v_node1, v_node2
+    cdef bint exo, obv_block
+    cdef int l0, l1
+    cdef list node_degrees = []
+    cdef list weights = []
 
     for k, clause in enumerate(clauses):
         for i in range(len(clause)):
@@ -267,32 +293,43 @@ def create_exo_and_band(clauses):
     return andg, bandg, exog
 
 
-def get_degrees_weights(G):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple get_degrees_weights(G):
     """
-            Function to get node degrees and weights for Full-AND, Blocked-AND and Exactly One Constraint Graphs
+    Function to get node degrees and weights for Full-AND, Blocked-AND and Exactly One Constraint Graphs
 
-            :param Graph:
-            :return: The degree of each node in the variable graph and the weight of each edge
+    :param Graph:
+    :return: The degree of each node in the variable graph and the weight of each edge
     """
-    node_degrees = []
-    weights = []
+    cdef list node_degrees = []
+    cdef list weights = []
+    cdef int degree
+    cdef tuple weight_tuple
 
     for n in G.nodes:
         degree = len(nx.edges(G, n))
-        for weight in G.edges.data("weight", n):
-            weights.append(weight[2])
+        for weight_tuple in G.edges.data("weight", n):
+            weights.append(weight_tuple[2])
         node_degrees.append(degree)
 
     return node_degrees, weights
 
-
-def get_graph_stats(name, node_degrees, weights=0):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef dict get_graph_stats(str name, list node_degrees, list weights=[]):
     """
-                Function to get statistics for different graphs
+    Function to get statistics for different graphs
 
-                :param node_degrees and weights:
-                :return: dictionary with different stats
+    :param node_degrees and weights:
+    :return: dictionary with different stats
     """
+    cdef double node_min, node_max, node_mode, node_mean, node_std, node_zeros, node_entropy, node_val_rate
+    cdef double weights_min, weights_max, weights_mode, weights_mean, weights_std, weights_zeros, weights_entropy, weights_val_rate
+    cdef list node_quantiles, weights_quantiles
+    cdef list node_stats, weights_stats
+    cdef list deg_names, weights_names
+    cdef dict stats_dict
 
     if not node_degrees:
         node_degrees = [0]

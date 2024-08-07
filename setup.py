@@ -14,6 +14,7 @@ extensions = [
     Extension("feature_computation.graph_features", ["feature_computation/graph_features.pyx"],),
     # Extension("feature_computation.stopwatch", ["feature_computation/stopwatch.pyx"],),
     Extension("feature_computation.dpll", ["feature_computation/dpll.pyx"],),
+    Extension("feature_computation.graph_features_manthey_alfonso", ["feature_computation/graph_features_manthey_alfonso.pyx"],),
 ]
 
 setup(
