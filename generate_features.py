@@ -1,7 +1,7 @@
 import sys
 from sat_instance.sat_instance import SATInstance
 
-if __name__ == "__main__":
+def main():
     # Ideal usage - call features, with filename to calculate from, and then options on preprocessing,
     # linux test setup
     try:
@@ -34,3 +34,6 @@ if __name__ == "__main__":
     print(satinstance.features_dict)
 
     # satinstance.write_results()
+
+if __name__ == "__main__":
+    main()

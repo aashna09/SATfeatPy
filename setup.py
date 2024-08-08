@@ -20,8 +20,24 @@ extensions = [
 ]
 
 setup(
-    name='feature_computation',
+    name='SATfeatPy',
+    version='0.1',
+    description='Python library to extract features from SAT problems. Re-production of SATzilla feature extractor.',
+    url='https://github.com/bprovanbessell/SATfeatPy',
     ext_modules=cythonize(extensions),
     include_dirs=[np.get_include()],
+    install_requires=[
+        'networkx==2.6.3',
+        # 'community==1.0.0',
+        'powerlaw==1.5',
+        'scikit-learn==1.0.2',
+        'scipy==1.7.3'
+    ],
+    python_requires='>=3.8',
+    entry_points={
+        'console_scripts': [
+            'generate_features=generate_features:main',
+        ],
+    },
     zip_safe=False,
 )
