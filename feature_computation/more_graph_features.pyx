@@ -1,10 +1,14 @@
+# cython: language_level=3
+
+import cython
 import math
 from feature_computation import array_stats
 import networkx as nx
-import scipy.stats
+from libc.math cimport log, pow
 
-
-def create_vg(clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple create_vg(list clauses):
     """
     A variable graph (VG) has a node for each variable, and an edge between variables that occur together in at least
     one clause
@@ -12,43 +16,52 @@ def create_vg(clauses):
     :param clauses:
     :return: The degree of each node in the variable graph
     """
-
-    # for each literal in a clause, for all the other literals in that clause and the weight for each edge
     vg = nx.Graph()
+    cdef:
+        int i, j, k
+        str v_node_i, v_node_j
+        list node_degrees = []
+        list weights = []
+        int degree
+        tuple weight_tuple
 
-    for k, clause in enumerate(clauses):
-
+    for clause in clauses:
+        k = 0
         for i in range(len(clause)):
-            k = 0
             for j in range(i + 1, len(clause)):
                 v_node_i = "v_" + str(abs(clause[i]))
                 v_node_j = "v_" + str(abs(clause[j]))
                 k += 1
                 vg.add_edge(v_node_i, v_node_j, weight=pow(2, -k))
 
-    node_degrees = []
-    weights = []
-
     for n in vg.nodes:
-        degree = len(nx.edges(vg, n))
+        degree = len(vg.edges(n))
         node_degrees.append(degree)
-        for weight in vg.edges.data("weight", n):
-            weights.append(weight[2])
+        for weight_tuple in vg.edges.data("weight", n):
+            weights.append(weight_tuple[2])
 
     return node_degrees, weights
 
 
-def create_cg(clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple create_cg(list clauses):
     """
     A clause graph (CG) has a node for each clause, and an edge between clauses that have the same literal
 
     :param clauses:
     :return: The degree of each node in the variable graph and the weight for each edge
     """
-
     cg = nx.Graph()
-
-    c_node = []
+    cdef:
+        list c_node = []
+        int i, j, degree
+        str c_n
+        list node_degrees = []
+        list weights = []
+        int weight
+        int literal
+        tuple weight_tuple
 
     for i, clause in enumerate(clauses):
         c_n = "c_" + str(i)
@@ -62,19 +75,18 @@ def create_cg(clauses):
                     weight += 1
                     cg.add_edge(c_node[i], c_node[i + 1 + j], weight=weight)
 
-    node_degrees = []
-    weights = []
-
     for n in cg.nodes:
-        degree = len(nx.edges(cg, n))
-        for weight in cg.edges.data("weight", n):
-            weights.append(weight[2])
+        degree = len(cg.edges(n))
+        for weight_tuple in cg.edges.data("weight", n):
+            weights.append(weight_tuple[2])
         node_degrees.append(degree)
 
     return cg, node_degrees, weights
 
 
-def create_rg(clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple create_rg(list clauses):
     """
     A resolution graph (RG) has a node for each clause, and an edge between clauses if they produce a
     non-tautological resolvent
@@ -82,10 +94,16 @@ def create_rg(clauses):
     :param clauses:
     :return: The degree of each node in the variable graph and the weight for each edge
     """
-
     rg = nx.Graph()
-
-    c_node = []
+    cdef:
+        list c_node = []
+        int i, j, degree
+        str c_n
+        list node_degrees = []
+        list weights = []
+        int k
+        double weight
+        tuple weight_tuple
 
     for i, clause in enumerate(clauses):
         c_n = "c_" + str(i)
@@ -98,19 +116,18 @@ def create_rg(clauses):
                 weight = pow(2, -(k - 2))
                 rg.add_edge(c_node[i], c_node[i + 1 + j], weight=weight)
 
-    node_degrees = []
-    weights = []
-
     for n in rg.nodes:
-        degree = len(nx.edges(rg, n))
-        for weight in rg.edges.data("weight", n):
-            weights.append(weight[2])
+        degree = len(rg.edges(n))
+        for weight_tuple in rg.edges.data("weight", n):
+            weights.append(weight_tuple[2])
         node_degrees.append(degree)
 
     return node_degrees, weights
 
 
-def create_big(clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple create_big(list clauses):
     """
     A binary implication graph (BIG) it's a directed graph that has a node for each literal, and an edge if
     there's an implication between the literals
@@ -118,10 +135,16 @@ def create_big(clauses):
     :param clauses:
     :return: The degree of each node in the variable graph and the weight of each edge
     """
-
     big = nx.DiGraph()
+    cdef:
+        int i
+        str v_node1, v_node2
+        int a, b, degree
+        list node_degrees = []
+        list weights = []
+        tuple weight_tuple
 
-    for k, clause in enumerate(clauses):
+    for clause in clauses:
         for i in range(len(clause)):
             v_node1 = "v_" + str(abs(clause[i]))
             v_node2 = "v_" + str(-abs(clause[i]))
@@ -135,30 +158,37 @@ def create_big(clauses):
             big.add_edge('v_' + str(-a), 'v_' + str(b), weight=1)
             big.add_edge('v_' + str(-b), 'v_' + str(a), weight=1)
 
-    node_degrees = []
-    weights = []
-
     for n in big.nodes:
-        degree = len(nx.edges(big, n))
-        for weight in big.edges.data("weight", n):
-            weights.append(weight[2])
+        degree = len(big.edges(n))
+        for weight_tuple in big.edges.data("weight", n):
+            weights.append(weight_tuple[2])
         node_degrees.append(degree)
 
     return big, node_degrees, weights
 
-
-def neighbors_nodes(l, clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef neighbors_nodes(int l, list clauses):
     big, _, _ = create_big(clauses)
     neighbors = big.neighbors('v_' + str(l))
     return neighbors
 
 
-def create_exo_and_band(clauses):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple create_exo_and_band(list clauses):
+    """
+    Create exo and band graphs based on clauses.
+    """
     andg = nx.Graph()
     bandg = nx.Graph()
     exog = nx.Graph()
+    cdef:
+        int i, k
+        str v_node1, v_node2
+        list rem_clause
 
-    for k, clause in enumerate(clauses):
+    for clause in clauses:
         for i in range(len(clause)):
             v_node1 = "v_" + str(abs(clause[i]))
             v_node2 = "v_" + str(-abs(clause[i]))
@@ -209,58 +239,60 @@ def create_exo_and_band(clauses):
     return andg, bandg, exog
 
 
-def return_degrees_weights(G):
-
-    node_degrees = []
-    weights = []
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple return_degrees_weights(G):
+    """
+    Return the degrees and weights of the nodes in the graph.
+    """
+    cdef:
+        list node_degrees = []
+        list weights = []
+        int degree
+        tuple weight_tuple
 
     for n in G.nodes:
-        degree = len(nx.edges(G, n))
-        for weight in G.edges.data("weight", n):
-            weights.append(weight[2])
+        degree = len(G.edges(n))
+        for weight_tuple in G.edges.data("weight", n):
+            weights.append(weight_tuple[2])
         node_degrees.append(degree)
 
     return node_degrees, weights
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef dict recursive_weight_heuristic(int max_clause_size, list clauses, int v):
+    """
+    Recursive weight heuristic algorithm for clauses.
+    """
+    cdef:
+        dict feat_dict = {}
+        int i, j, clause_len, iteration, num_v, p, curr_lit, comp_ind
+        double muh = 1.0
+        double gamma = 5.0
+        double max_double = 10e200
+        double a1, a2, clause_constant, clause_value
+        list this_data_pos = [0] * (v + 1)
+        list this_data_neg = [0] * (v + 1)
+        list this_data = [this_data_pos, this_data_neg]
+        list last_data_pos = [1] * (v + 1)
+        list last_data_neg = [1] * (v + 1)
+        list last_data = [last_data_pos, last_data_neg]
+        list all_sequences = []
+        int iteration_steps
+        list this_iteration_sequence
+        bint found_zero
 
-def recursive_weight_heuristic(max_clause_size, clauses, v):
-
-    # Code translated from RISS... I am sure there are some errors in the original code, which have been translated to this python implementation
-
-    assert(max_clause_size > 0)
-
-    feat_dict = {}
-
-    # current value for each literal
-    # Might want to add +1 so we can use the literals as indices...
-    this_data_pos = [0] * (v+1)
-    this_data_neg = [0] * (v + 1)
-
-    this_data = [this_data_pos, this_data_neg]
-    last_data_pos = [1] * (v + 1)
-    last_data_neg = [1] * (v + 1)
-
-    last_data = [last_data_pos, last_data_neg]
-
-    muh = 1
-    gamma = 5
-    max_double = 10e200
-
-    all_sequences = []
-
-    # for 3 interations
-    for iteration in range(1, (3+1)):
-
+    for iteration in range(1, 4):  # 3 iterations
         iteration_steps = 0
         this_iteration_sequence = []
 
-        # how likely the remaining clauses will be falsified by the model
         for i in range(len(clauses)):
-
             clause = clauses[i]
             clause_len = len(clause)
 
-            if (clause_len == 1): continue
+            if clause_len == 1:
+                continue
 
             if max_clause_size < clause_len:
                 exponent = 0
@@ -275,49 +307,35 @@ def recursive_weight_heuristic(max_clause_size, clauses, v):
                 a2 = math.pow(muh, clause_len - 1)
             except OverflowError:
                 a2 = float("inf")
+                
             clause_constant = a1 / a2
-
             found_zero = False
-            clause_value = 1
-            # calculate the constant for the clause
+            clause_value = 1.0
+
             for j in range(clause_len):
                 curr_lit = clause[j]
+                comp_ind = 0 if curr_lit < 0 else 1
 
-                if curr_lit < 0:
-                    comp_ind = 0
-                else:
-                    comp_ind = 1
-
-                # tilde is complement
                 if last_data[comp_ind][curr_lit] == 0:
                     found_zero = True
                     break
 
-                clause_value = clause_value * last_data[comp_ind][curr_lit]
+                clause_value *= last_data[comp_ind][curr_lit]
                 iteration_steps += 1
 
             if not found_zero:
-                # only if there is no non-zero literal inside, add the values
-                clause_value = clause_value * clause_constant
+                clause_value *= clause_constant
 
-                # for each literal, divide the clause value by the  value for the corresponding complement to fit the calculation formula
                 for j in range(clause_len):
                     curr_lit = clause[j]
-
-                    if curr_lit < 0:
-                        comp_ind = 0
-                    else:
-                        comp_ind = 1
+                    comp_ind = 0 if curr_lit < 0 else 1
 
                     this_data[comp_ind][curr_lit] += clause_value / last_data[comp_ind][curr_lit]
 
-        # sequence for iteration i
-        muh = 0
-        for num_v in range(1, v+1):
+        muh = 0.0
+        for num_v in range(1, v + 1):
             for p in range(2):
-
-                # basically for positive and negative literals
-                val = this_data[p][v]
+                val = this_data[p][num_v]
                 if val > max_double:
                     this_iteration_sequence.append(max_double)
                 else:
@@ -327,14 +345,14 @@ def recursive_weight_heuristic(max_clause_size, clauses, v):
 
             iteration_steps += 1
 
-        muh = muh / 2 * v
+        muh /= (2.0 * v)
 
-        if muh < 1: muh = 1
+        if muh < 1.0:
+            muh = 1.0
 
         last_data = this_data
         this_data_pos = [0] * (v + 1)
         this_data_neg = [0] * (v + 1)
-
         this_data = [this_data_pos, this_data_neg]
 
         all_sequences.append(this_iteration_sequence)
@@ -344,7 +362,15 @@ def recursive_weight_heuristic(max_clause_size, clauses, v):
 
     return feat_dict
 
-def write_stats(l, name, features_dict):
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef void write_stats(list l, str name, dict features_dict):
+    """
+    Compute and store statistics for a list of values.
+    """
+    cdef double l_mean, l_coeff, l_min, l_max
+
     l_mean, l_coeff, l_min, l_max = array_stats.get_stats(l)
 
     features_dict[name + "_mean"] = l_mean

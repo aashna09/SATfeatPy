@@ -16,6 +16,7 @@ extensions = [
     Extension("feature_computation.dpll", ["feature_computation/dpll.pyx"],),
     Extension("feature_computation.graph_features_manthey_alfonso", ["feature_computation/graph_features_manthey_alfonso.pyx"],),
     Extension("feature_computation.graph_features_ansotegui", ["feature_computation/graph_features_ansotegui.pyx"], extra_compile_args=["-O3"], language="c++"),
+    Extension("feature_computation.more_graph_features", ["feature_computation/more_graph_features.pyx"],),
 ]
 
 setup(
