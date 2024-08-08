@@ -1,8 +1,15 @@
-import networkx
-import networkx as nx
+# cython: language_level=3
+import cython
 import math
-import community as community_louvain
 import powerlaw
+import networkx as nx
+from libcpp.vector cimport vector
+from libc.math cimport log, pow
+import community as community_louvain
+from cython.cimports import networkx as nx
+
+cimport numpy as cnp
+
 """
 Graph features from Structure features for SAT instances classification (Ansotegui)
 ------
@@ -39,7 +46,9 @@ We can find this maximum partition with the community package (uses louvain meth
 """
 
 
-def estimate_power_law_alpha(clauses, c, v):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef double estimate_power_law_alpha(list clauses, int c, int v):
     """
     Estimates the power law alpha (Code adapted from Ansotegui implementation)
     :param clauses:
@@ -47,40 +56,55 @@ def estimate_power_law_alpha(clauses, c, v):
     :param v:
     :return: best fit estimated alpha
     """
+    cdef list X, Y, Sylogx, Syx
     X, Y, Sylogx, Syx = variable_occurrences(clauses, c, v)
-    alpha = most_likely(X, Y, Sylogx, Syx)
+    return most_likely(X, Y, Sylogx, Syx)
 
-    return alpha
 
-def variable_occurrences(clauses, c, v):
-    variable_count = [0] * (v + 1)
-
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple variable_occurrences(list clauses, int c, int v):
+    cdef int i, count
+    cdef double Sy
+    cdef list variable_count = [0] * (v + 1)
+    cdef list f_v_k = [0] * (c + 1)
+    cdef list count_occurrences = []
+    cdef list X = []
+    cdef list Y = []
+    cdef list Sylogx = []
+    cdef list Syx = []
+    
     for clause in clauses:
         for literal in clause:
             variable_count[abs(literal)] += 1
 
-    f_v_k = [0] * (c + 1)
     for count in variable_count[1:]:
         f_v_k[count] += 1
-    count_occurrences = [(count, occurrences) for count, occurrences in enumerate(f_v_k) if occurrences != 0]
+    
+    for count, occurrences in enumerate(f_v_k):
+        if occurrences != 0:
+            count_occurrences.append((count, occurrences)) 
 
-    Sy = sum(occurrences for count, occurrences in count_occurrences)
-    n = len(count_occurrences)
-    X = [count for count, occurrences in count_occurrences if count > 0]  # Ensure counts are positive for log
-    Y = [0] * n
-    Sylogx = [0] * n
-    Syx = [0] * n
+    for count, occurrences in count_occurrences:
+        Sy += occurrences
+        if count > 0:
+            X.append(count)  # Ensure counts are positive for log
+        Y.append(0)
+        Sylogx.append(0)
+        Syx.append(0)
 
-    for i in range(n-2, -1, -1):  # Adjusted the range here
+    for i in range(len(count_occurrences)-2, -1, -1):  # Adjusted the range here
         Y[i] = Y[i+1] + count_occurrences[i][1] / Sy if Sy > 0 else 0
         if X[i] > 0:  # Check to avoid math domain error
-            Sylogx[i] = Sylogx[i+1] + count_occurrences[i][1] / Sy * math.log(X[i])
+            Sylogx[i] = Sylogx[i+1] + count_occurrences[i][1] / Sy * log(X[i])
             Syx[i] = Syx[i+1] + count_occurrences[i][1] / Sy * X[i]
 
     return X, Y, Sylogx, Syx
 
 
-def most_likely(X, Y, sylogx, syx, maxxmin=10, verbose=False):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef double most_likely(list X, list Y, list Sylogx, list Syx, int maxxmin=10, bint verbose=False):
     """
     Fits the data to a powerlaw
     :param X:
@@ -91,31 +115,27 @@ def most_likely(X, Y, sylogx, syx, maxxmin=10, verbose=False):
     :param verbose:
     :return: The best alpha
     """
-
-    best_alpha = 0
-    best_x_min_a = 0
-    best_diff_a = 1
-
-    best_ind_a = 0
-    where_a = 0
-
-    n = len(X)
+    cdef int n = len(X)
+    cdef int ind, j
+    cdef double xmin, alpha
+    cdef double best_alpha = 0
+    cdef double best_x_min_a = 0
+    cdef double best_diff_a = 1
+    cdef double worst_diff, worst_x
+    cdef double aux
+    cdef int best_ind_a = 0
+    cdef double where_a = 0
 
     for ind in range(1, maxxmin + 1):
         if ind < n-3:
-
             xmin = X[ind]
-            alpha = -1 - (1 / ((sylogx[ind] / Y[ind]) - math.log((xmin - 0.5))))
+            alpha = -1 - (1 / ((Sylogx[ind] / Y[ind]) - log((xmin - 0.5))))
 
-            # beta = math.log(1 / (syx[ind] / Y[ind] - xmin) + 1)
-
-            #model powerlaw
             worst_diff = -1
             worst_x = -1
 
             for j in range(ind+1, n):
-                aux = abs(Y[j]/Y[ind] - pow_law_c(X[j], xmin, alpha))
-
+                aux = abs(Y[j] / Y[ind] - pow_law_c(X[j], xmin, alpha))
                 if aux >= best_diff_a:
                     worst_diff = aux
                     worst_x = X[j]
@@ -126,16 +146,15 @@ def most_likely(X, Y, sylogx, syx, maxxmin=10, verbose=False):
 
             for j in range(ind, n-1):
                 if X[j] + 1 < X[j+1]:
-                    aux = abs(Y[j+1]/Y[ind] - pow_law_c(X[j] + 1, xmin, alpha))
-
+                    aux = abs(Y[j+1] / Y[ind] - pow_law_c(X[j] + 1, xmin, alpha))
                     if aux >= best_diff_a:
                         worst_diff = aux
-                        worst_x = X[j]+1
+                        worst_x = X[j] + 1
                         # finish search of worst difference
                         break
                     elif aux >= worst_diff:
                         worst_diff = aux
-                        worst_x = X[j]+1
+                        worst_x = X[j] + 1
 
             if worst_diff < best_diff_a:
                 best_alpha = alpha
@@ -148,10 +167,13 @@ def most_likely(X, Y, sylogx, syx, maxxmin=10, verbose=False):
         print("alpha: ", -best_alpha)
         print("min: ", best_x_min_a)
         print("error ", best_diff_a, " in ", where_a)
+        
     return -best_alpha
 
 
-def pow_law_c(x, xmin, alpha):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef double pow_law_c(double x, double xmin, double alpha):
     """
     Computes sum_{i = x} ^ {\infty} x ^ {alpha} / sum_{i = xmin} ^ {\infty} x ^ {alpha}
     or approximates it as (x / xmin) ^ (alpha + 1)
@@ -160,60 +182,47 @@ def pow_law_c(x, xmin, alpha):
     :param alpha:
     :return:
     """
+    cdef int max_iterations = 10000
+    cdef int i
+    cdef double num = 0
+    cdef double den = 0
+    cdef double p, p_old = -2
 
-    assert (alpha < -1)
-    assert (xmin <= x)
-
-    max_iterations = 10000
-
-    num = 0
-    den = 0
-
-    i = xmin
+    assert alpha < -1
+    assert xmin <= x
 
     if xmin < 25:
-        while i < x:
-            den += math.pow(i, alpha)
-            i += 1
-
-        p_old = -2
+        for i in range(int(xmin), int(x)):
+            den += pow(i, alpha)
         p = -1
-        n = 0
 
-        while abs(p - p_old) > 0.00000001 and n < max_iterations:
-            den += math.pow(i, alpha)
-            num += math.pow(i, alpha)
-
-            i += 1
-            n += 1
+        for i in range(int(x), int(x) + max_iterations):
+            den += pow(i, alpha)
+            num += pow(i, alpha)
             p_old = p
-            p = num/den
+            p = num / den
 
-        if n < max_iterations:
-            return p
+            if abs(p - p_old) <= 0.00000001:
+                return p
+        return p
 
-    return math.pow(x / xmin, alpha + 1)
+    return pow(x / xmin, alpha + 1)
 
 
-def estimate_power_law_alpha_lib(data):
+cpdef double estimate_power_law_alpha_lib(list data):
     """
     Uses the powerlaw package to fit data, however this does not take into account missing data
     :param data:
     :return:
     """
-    # Assuming that this function follows a power-law distribution (f_v(k) roughly = ck^-a_v),
-    # we can estimate the exponent a_v of the power law distribution that bes fits this collection of points.
-    # Use maximum likelihood estimator
-
-    # use pwerlaw package, results with 0 are removed... Not sure on a theoretical level if they should be replaced with something or...
-    data = [x for x in data if x > 0]
-
-    results = powerlaw.Fit(data)
-
+    cdef list cleaned_data = [x for x in data if x > 0]
+    results = powerlaw.Fit(cleaned_data)
     return results.power_law.alpha
 
 
-def create_cvig(clauses, c, v):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef create_cvig(list clauses, int c, int v):
     """
     Create a Clause Variable incidence graph
     Set of vertices is the set of variables and set of clauses,
@@ -225,37 +234,30 @@ def create_cvig(clauses, c, v):
     :return: Variable node degrees and clause node degrees
     """
     cvig = nx.Graph()
+    cdef list v_nodes = [i for i in range(1, v+1)]
+    cdef list c_nodes = [i for i in range(v+1, v+1+c)]
 
-    # Node for each variable
-    # node for each clause
-
-    # create the variable and clause nodes
-    v_nodes = [i for i in range(1, v+1)]
-    c_nodes = [i for i in range(v+1, v+1+c)]
+    cdef int i, k
+    cdef double weight
+    cdef int c_node, var_num
+    cdef list abs_clause
 
     for i, clause in enumerate(clauses):
         abs_clause = [abs(lit) for lit in clause]
-
-        weight = 1/len(clause)
-
+        weight = 1 / len(clause)
         c_node = c_nodes[i]
 
-        # for the variable, not the literal
         for k, v_node in enumerate(v_nodes):
-
-            var_num = k+1
-
+            var_num = k + 1
             if var_num in abs_clause:
-                # weight should be 1/ size of the clause
                 cvig.add_edge(c_node, v_node, weight=weight)
-            # else:
-            #     # If the variable is not in the clause, then the weight should be 0
-            #     cvig.add_edge(c_node, v_node, weight=0)
 
     return cvig
 
 
-def create_vig(clauses, c, v):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef create_vig(list clauses, int c, int v):
     """
     Create a Variable incidence graph
     Set of vertices is the set of variables,
@@ -266,92 +268,85 @@ def create_vig(clauses, c, v):
     :param v:
     :return: Variable node degrees and clause node degrees
     """
-
     vig = nx.Graph()
+    cdef int i, j
+    cdef double weight
+    cdef list clause
+    cdef int v_node_i, v_node_j
+    cdef dict edge_data
+    cdef double edge_weight
 
     for clause in clauses:
-        # Ensure that the clause has at least two literals to compute the weight
         if len(clause) < 2:
             continue
 
-        # Compute the weight as 1 / (|c| choose 2)
         weight = 1 / math.comb(len(clause), 2)
 
-        # Iterate through all pairs of variables in the clause to update the edge weights
         for i in range(len(clause)):
             for j in range(i + 1, len(clause)):
                 v_node_i = abs(clause[i])
                 v_node_j = abs(clause[j])
 
-                # Check if the edge already exists and update the weight accordingly
-                edge_weight = vig.get_edge_data(v_node_i, v_node_j, default={'weight': 0})['weight']
-                edge_weight += weight
+                edge_data = vig.get_edge_data(v_node_i, v_node_j, default={'weight': 0})
+                edge_weight = edge_data['weight'] + weight
 
-                # Add or update the edge with the new weight
                 vig.add_edge(v_node_i, v_node_j, weight=edge_weight)
 
     return vig
 
 
-def compute_modularity_q(graph):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef double compute_modularity_q(graph):
     """
     Compute the modularity of the best partition (as estimated by the louvain method, using the python-louvain package
     :param graph:
-    :return: The modularit of the graph
+    :return: The modularity of the graph
     """
-    # get the best partition
-    partition = community_louvain.best_partition(graph)
-
-    # calculate the modularity of the partition
-    modularity = community_louvain.modularity(partition, graph)
-
-    return modularity
+    cdef dict partition = community_louvain.best_partition(graph)
+    return community_louvain.modularity(partition, graph)
 
 
-def burning_by_node_degree(graph, n: int):
+# Define the sorting key function
+def get_second_item(element):
+    return element[1]
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef list burning_by_node_degree(graph, int n):
     """
     Burning by node degree algorithm, adapted from paper pseudocode and implementation
     :param graph:
     :param n:
     :return: N(r) estimated number of circles needed to cover the graph for each circle radius r
     """
-    # order nodes according to their degree such that degree(vi) >= degree(vj) when i < j
-
-    # n is number of nodes
-    # pseudocode in thesis of jesus giraldez, page 67...
-    # returns vector N(r), then fractal dimension d must be calculated from this...
-    # Supposedly we can assume N(r) ~ r^-d
-    # Use regression, and then interpolation to get d...
-    N = [0] * (n)
+    cdef int i
+    cdef list N = [0] * n
     N[1] = n
-    i = 2
+    cdef list node_degrees = []
+    cdef int num_connected_components = nx.number_connected_components(graph)
+    cdef int dmaxx = 16
+    cdef list burned
+    cdef list S
+    cdef int c
+    cdef int node
 
-    # Order the nodes in terms of their degree
-    node_degrees = []
     for node in graph.nodes:
         degree = len(nx.edges(graph, node))
         node_degrees.append((node, degree))
 
-    # sort in terms of the degree, descending
-    node_degrees.sort(key=lambda x: x[1], reverse=True)
-
-    num_connected_components = networkx.number_connected_components(graph)
-    dmaxx = 16
-
-    for i in range(1, min(dmaxx+1, len(N))):
+    node_degrees.sort(key=get_second_item, reverse=True)
+    for i in range(1, min(dmaxx + 1, len(N))):
         if N[i - 1] > num_connected_components:
             burned = [False] * (n + 1)
             burned[0] = True
 
-            # if any member in burned is still false
             while not all(burned):
                 c = highest_degree_unburned_node(node_degrees, burned)
-                # for every possible node c.
-                S = circle(c, i-1, graph) # circle with centre c and radius i
+                S = circle(c, i - 1, graph)
 
-                # print("nodes in circle", S)
                 for x in S:
-
                     burned[x] = True
 
                 N[i] += 1
@@ -359,20 +354,25 @@ def burning_by_node_degree(graph, n: int):
     return N
 
 
-def highest_degree_unburned_node(node_degrees, burned):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef int highest_degree_unburned_node(list node_degrees, list burned):
     """
     Get the node with the highest degree that is still unburned
     :param node_degrees:
     :param burned:
     :return:
     """
-    # nodes are pre sorted in terms of their degree, does not change
-    for (node, degree) in node_degrees:
+    cdef tuple node_degree
+    for node_degree in node_degrees:
+        node, degree = node_degree
         if not burned[node]:
             return node
 
 
-def circle(centre, radius, graph):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef list circle(int centre, int radius, graph):
     """
     Get the nodes within the circle with centre and radius
     :param centre:
@@ -380,54 +380,48 @@ def circle(centre, radius, graph):
     :param graph:
     :return:
     """
-    # circle with centre c and radius i
-    # centre is a node
-    # A circle of centre c and radius r is a subset of nodes of G
-    # such that the distance (just in terms of how many nodes away from the center) between any of them and the node c, is smaller than r
-    subgraph = networkx.generators.ego_graph(G=graph, n=centre, radius=radius)
-
-    # return the nodes in the graph
-    return subgraph.nodes
+    subgraph = nx.generators.ego_graph(G=graph, n=centre, radius=radius)
+    return list(subgraph.nodes)
 
 
-def linear_regression_fit(data):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple linear_regression_fit(list data):
     """
     Fit data with a linear regression and interpolation, adapted from code for ansotegui
     :param data:
     :return:
     """
-    data = [x for x in data if x>0]
-    # trim data to have no leading or trailing 0s
+    cdef list trimmed_data = [x for x in data if x > 0]
+    cdef list poly_regression_X = [log(x) for x in range(1, len(trimmed_data) + 1)]
+    cdef list poly_regression_Y = [log(x) for x in trimmed_data]
+    cdef list exp_regression_X = [x for x in range(1, len(trimmed_data) + 1)]
+    cdef list exp_regression_Y = poly_regression_Y
 
-    poly_regression_X = [math.log(x) for x in range(1, len(data) + 1)]
-    poly_regression_Y = [math.log(x) for x in data]
-    exp_regression_X = [x for x in range(1, len(data) + 1)]
-    exp_regression_Y = poly_regression_Y
-
-    poly = regression(poly_regression_X, poly_regression_Y)
-    exp = regression(exp_regression_X, exp_regression_Y)
-
-    # estimate with linear regression interpolating points log N(r) vs log r
+    cdef tuple poly = regression(poly_regression_X, poly_regression_Y)
+    cdef tuple exp = regression(exp_regression_X, exp_regression_Y)
 
     return -poly[0], -exp[0]
 
 
-def regression(X, Y):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple regression(list X, list Y):
     """
     Perform the regression
     :param X:
     :param Y:
     :return:
     """
-    # given list of points, computes the alpha abd beta of a regression, translated from paper
-    Sx = sum(X)
-    Sy = sum(Y)
-    Sxx = sum([x*x for x in X])
-    Syy = sum([y*y for y in Y])
-    Sxy = sum([x * y for (x, y) in zip(X, Y)])
+    cdef double Sx = sum(X)
+    cdef double Sy = sum(Y)
+    cdef double Sxx = sum([x * x for x in X])
+    cdef double Syy = sum([y * y for y in Y])
+    cdef double Sxy = sum([x * y for (x, y) in zip(X, Y)])
+    cdef double alpha, beta
 
     try:
-        alpha = (Sx * Sy - len(X) * Sxy)/(Sx * Sx - len(X) * Sxx)
+        alpha = (Sx * Sy - len(X) * Sxy) / (Sx * Sx - len(X) * Sxx)
         beta = Sy / len(X) - alpha * Sx / len(X)
     except ZeroDivisionError:
         alpha = 1

@@ -8,6 +8,7 @@ SAT-features/cpp_code/
 # Ignore Cython-generated C files
 build/
 feature_computation/*.c
+feature_computation/*.cpp
 feature_computation/*.so
 feature_computation/*.pyd
 # My temp generated files
