@@ -3,6 +3,8 @@ from Cython.Build import cythonize
 import numpy as np
 
 extensions = [
+    Extension("sat_instance.sat_instance", ["sat_instance/sat_instance.pyx"]),
+    Extension("sat_instance.write_to_file", ["sat_instance/write_to_file.pyx"]),
     Extension("feature_computation.active_features", ["feature_computation/active_features.pyx"]),
     Extension("feature_computation.enums", ["feature_computation/enums.pyx"]),
     Extension("feature_computation.array_stats", ["feature_computation/array_stats.pyx"], include_dirs=[np.get_include()]),

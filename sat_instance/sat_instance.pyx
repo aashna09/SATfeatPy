@@ -1,18 +1,26 @@
+# cython: language_level=3, boundscheck=False, wraparound=False
 from feature_computation import preprocessing, parse_cnf, active_features, base_features, local_search_probing, \
     graph_features_ansotegui, graph_features_manthey_alfonso, more_graph_features
 from feature_computation.dpll import DPLLProbing
+from feature_computation.enums cimport VarState, ClauseState 
 from sat_instance import write_to_file
 
 
-class SATInstance:
+cdef class SATInstance:
     """
     Class to hold the methods for generating features from a cnf. This class handles the parsing of the cnf file into
     data structures necessary to the perform feature extraction. Then the various features can be generated, and are
     stored in the features dictionary.
-
     """
+    cdef bint verbose, preprocess, solved
+    cdef str path_to_cnf
+    cdef list clauses, num_active_clauses_with_var, num_bin_clauses_with_var, unit_clauses
+    cdef int c, v, num_active_vars, num_active_clauses
+    cdef list clause_states, clause_lengths, clauses_with_positive_var, clauses_with_negative_var, var_states
+    cdef dict features_dict
 
-    def __init__(self, input_cnf, preprocess=True, verbose=False, preprocess_tmp=True):
+
+    def __init__(self, str input_cnf, bint preprocess=True, bint verbose=False, bint preprocess_tmp=True):
         self.verbose = verbose
         self.preprocess = preprocess
         self.path_to_cnf = input_cnf
@@ -75,7 +83,7 @@ class SATInstance:
             print("First round of unit propagation")
         self.dpll_prober.unit_prop(0, 0)
 
-    def clauses_with_literal(self, literal):
+    def clauses_with_literal(self, int literal):
         """
         Returns a list of clauses that contain the literal
         :param literal:
@@ -98,7 +106,7 @@ class SATInstance:
             print("Generating basic features")
 
         base_features_dict = base_features.compute_base_features(self.preprocess, self.clauses, self.c, self.v, self.num_active_vars,
-                                                                 self.num_active_clauses)
+                                                                    self.num_active_clauses)
         self.features_dict.update(base_features_dict)
 
     def gen_dpll_probing_features(self):
@@ -109,9 +117,7 @@ class SATInstance:
             print("DPLL probing")
 
         self.dpll_prober.unit_propagation_probe(False)
-
         self.dpll_prober.search_space_probe()
-
         self.dpll_prober.combined_probing()
 
         self.features_dict.update(self.dpll_prober.unit_props_log_nodes_dict)
@@ -134,13 +140,13 @@ class SATInstance:
         if self.verbose:
             print("Generating features from Ansotegui")
 
-        if self.preprocess == False:
+        if not self.preprocess:
             # print(self.v)
             self.num_active_clauses = self.c
             self.num_active_vars = self.v    
         
         alpha = graph_features_ansotegui.estimate_power_law_alpha(self.clauses, self.num_active_clauses,
-                                                                  self.num_active_vars)
+                                                                    self.num_active_vars)
 
         vig = graph_features_ansotegui.create_vig(self.clauses, self.num_active_clauses, self.num_active_vars)
         cvig = graph_features_ansotegui.create_cvig(self.clauses, self.num_active_clauses, self.num_active_vars)
@@ -153,11 +159,12 @@ class SATInstance:
         d_poly, d_exp = graph_features_ansotegui.linear_regression_fit(N_vig)
         db_poly, db_exp = graph_features_ansotegui.linear_regression_fit(N_cvig)
 
-        ansotegui_features = {"vig_modularty": modularity,
-                              "vig_d_poly": d_poly,
-                              "cvig_db_poly": db_poly,
-                              "variable_alpha": alpha
-                              }
+        ansotegui_features = {
+            "vig_modularty": modularity,
+            "vig_d_poly": d_poly,
+            "cvig_db_poly": db_poly,
+            "variable_alpha": alpha
+        }
 
         self.features_dict.update(ansotegui_features)
 
@@ -167,39 +174,35 @@ class SATInstance:
 
         v_nd_p, v_nd_n, c_nd_p, c_nd_n = graph_features_manthey_alfonso.create_vcg(self.clauses)
 
-        all_stats = [graph_features_manthey_alfonso.get_graph_stats("v_nd_p_", v_nd_p),
-                     graph_features_manthey_alfonso.get_graph_stats("v_nd_n_", v_nd_n),
-                     graph_features_manthey_alfonso.get_graph_stats("c_nd_p_", c_nd_p),
-                     graph_features_manthey_alfonso.get_graph_stats("c_nd_n_", c_nd_n)]
+        all_stats = [
+            graph_features_manthey_alfonso.get_graph_stats("v_nd_p_", v_nd_p),
+            graph_features_manthey_alfonso.get_graph_stats("v_nd_n_", v_nd_n),
+            graph_features_manthey_alfonso.get_graph_stats("c_nd_p_", c_nd_p),
+            graph_features_manthey_alfonso.get_graph_stats("c_nd_n_", c_nd_n)
+        ]
 
         nd, w = graph_features_manthey_alfonso.create_vg(self.clauses)
         all_stats.append(graph_features_manthey_alfonso.get_graph_stats("vg_al_", nd, w))
 
         nd, w = graph_features_manthey_alfonso.create_cg(self.clauses)
-        cg_stats = graph_features_manthey_alfonso.get_graph_stats("cg_al_", nd, w)
-        all_stats.append(cg_stats)
+        all_stats.append(graph_features_manthey_alfonso.get_graph_stats("cg_al_", nd, w))
 
         nd, w = graph_features_manthey_alfonso.create_rg(self.clauses)
-        rg_stats = graph_features_manthey_alfonso.get_graph_stats("rg_", nd, w)
-        all_stats.append(rg_stats)
+        all_stats.append(graph_features_manthey_alfonso.get_graph_stats("rg_", nd, w))
 
         _, nd, w = graph_features_manthey_alfonso.create_big(self.clauses)
-        big_stats = graph_features_manthey_alfonso.get_graph_stats("big_", nd, w)
-        all_stats.append(big_stats)
+        all_stats.append(graph_features_manthey_alfonso.get_graph_stats("big_", nd, w))
 
         andg, bandg, exog = graph_features_manthey_alfonso.create_exo_and_band(self.clauses)
 
         nd, w = graph_features_manthey_alfonso.get_degrees_weights(andg)
-        and_stats = graph_features_manthey_alfonso.get_graph_stats("and_", nd, w)
-        all_stats.append(and_stats)
+        all_stats.append(graph_features_manthey_alfonso.get_graph_stats("and_", nd, w))
 
         nd, w = graph_features_manthey_alfonso.get_degrees_weights(bandg)
-        band_stats = graph_features_manthey_alfonso.get_graph_stats("band_", nd, w)
-        all_stats.append(band_stats)
+        all_stats.append(graph_features_manthey_alfonso.get_graph_stats("band_", nd, w))
 
         nd, w = graph_features_manthey_alfonso.get_degrees_weights(exog)
-        exo_stats = graph_features_manthey_alfonso.get_graph_stats("exo_", nd, w)
-        all_stats.append(exo_stats)
+        all_stats.append(graph_features_manthey_alfonso.get_graph_stats("exo_", nd, w))
 
         for stats_dict in all_stats:
             self.features_dict.update(stats_dict)

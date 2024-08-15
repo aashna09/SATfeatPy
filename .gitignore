@@ -11,9 +11,14 @@ feature_computation/*.c
 feature_computation/*.cpp
 feature_computation/*.so
 feature_computation/*.pyd
+sat_instance/*.c
+sat_instance/*.cpp
+sat_instance/*.so
+sat_instance/*.pyd
 # My temp generated files
 counting_benchmarks/
 results/
 results_counting_benchmarks/
 generate_report*.py
 total_time_comparison.png
+*.egg-info/
