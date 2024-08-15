@@ -1,18 +1,44 @@
 # cython: language_level=3
 
 from feature_computation.enums cimport VarState, ClauseState
+import numpy as np
 cimport cython
-from cython.view cimport array
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef VarState int_to_VarState(int state):
+    if state == 1:
+        return VarState.TRUE_VAL
+    elif state == 2:
+        return VarState.FALSE_VAL
+    elif state == 3:
+        return VarState.UNASSIGNED
+    elif state == 4:
+        return VarState.IRRELEVANT
+    else:
+        raise ValueError(f"Invalid state: {state}")
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef ClauseState int_to_ClauseState(int state):
+    if state == 1:
+        return ClauseState.ACTIVE
+    elif state == 2:
+        return ClauseState.PASSIVE
+    else:
+        raise ValueError(f"Invalid state: {state}")
 
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def get_active_features(sat_instance, clauses, int c, int v):
     # initialize the lists that contain information on the clauses and variables
-    cdef int[:] clause_states = array(int, (c,))
-    cdef int[:] num_active_clauses_with_var = array(int, (v + 1,))
-    cdef int[:] num_bin_clauses_with_var = array(int, (v + 1,))
-    cdef int[:] clause_lengths = array(int, (c,))
+    clause_states = [ClauseState.PASSIVE] * c
+    cdef long[:] num_active_clauses_with_var = np.empty(v+1, dtype=np.long)
+    cdef long[:] num_bin_clauses_with_var = np.empty(v+1, dtype=np.long)
+    cdef long[:] clause_lengths = np.empty(v+1, dtype=np.long)
 
     unit_clauses = []
 
@@ -91,7 +117,7 @@ def get_active_features(sat_instance, clauses, int c, int v):
 
     # Now remove the redundant variables
     cdef int num_active_vars = v
-    cdef int[:] var_states = array(int, (v + 1,))
+    cdef double[:] var_states = np.empty(v+1, dtype=np.double)
 
     var_states[0] = VarState.IRRELEVANT
 
@@ -109,14 +135,15 @@ def get_active_features(sat_instance, clauses, int c, int v):
     sat_instance.num_active_clauses = num_active_clauses
 
     sat_instance.clauses = clauses
-    sat_instance.clause_states = [ClauseState(state) for state in clause_states]
+    
+    sat_instance.clause_states = [int_to_ClauseState(state) for state in clause_states]
     sat_instance.clause_lengths = clause_lengths
     sat_instance.num_active_clauses_with_var = num_active_clauses_with_var
 
     sat_instance.num_bin_clauses_with_var = num_bin_clauses_with_var
     sat_instance.unit_clauses = unit_clauses
 
-    sat_instance.var_states = [VarState(state) for state in var_states]
+    sat_instance.var_states = [int_to_VarState(state) for state in var_states]
     # all of the clauses that contain a positive version of this variable
     sat_instance.clauses_with_positive_var = clauses_with_positive_var
     sat_instance.clauses_with_negative_var = clauses_with_negative_var
