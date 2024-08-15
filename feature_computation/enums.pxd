@@ -1,4 +1,5 @@
 # cython: language_level=3
+cimport cython
 
 cdef enum VarState:
     TRUE_VAL = 1
