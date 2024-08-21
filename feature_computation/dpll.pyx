@@ -428,10 +428,13 @@ cdef class DPLLProbing:
         cdef int clause_num, literal, curr_var, i, j
 
         for clause_num in self.sat_instance.clauses_with_literal(-orig_literal):
+            # iterate through all of the clauses that contain this literal
+            # if it is active
             if self.sat_instance.clause_states[clause_num] == ClauseState.ACTIVE:
                 self.reduced_clauses.append(clause_num)
                 num_clauses_reduced += 1
-                print(f"len(self.sat_instance.clause_lengths): {self.sat_instance.clause_lengths} and clause_num: {clause_num}")
+
+                # decrease the size (this length actually represents the number of yet to be assigned variables within that clause)
                 self.sat_instance.clause_lengths[clause_num] -= 1
 
                 if self.sat_instance.clause_lengths[clause_num] == 2:

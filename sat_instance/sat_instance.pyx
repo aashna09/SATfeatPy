@@ -14,7 +14,6 @@ cdef class SATInstance:
     stored in the features dictionary.
     """
     def __init__(self, str input_cnf, bint preprocess=True, bint verbose=False, bint preprocess_tmp=True):
-        print("Aashna - 0")
         self.verbose = verbose
         self.preprocess = preprocess
         self.path_to_cnf = input_cnf
@@ -22,7 +21,6 @@ cdef class SATInstance:
         # satelite preprocessing
         # n.b. satelite only works on linux, mac no longer supports 32 bit binaries...
         
-        print("Aashna - 1")
         if self.preprocess:
             if self.verbose:
                 print("Preprocessing with SatELite")
@@ -58,7 +56,6 @@ cdef class SATInstance:
         # stack of indexes of the clauses that have 1 literal
         self.unit_clauses = []
 
-        print("Aashna - 2")
         # all of the clauses that contain a positive version of this variable
         self.clauses_with_positive_var = []
         self.clauses_with_negative_var = []
@@ -78,7 +75,6 @@ cdef class SATInstance:
         if self.verbose:
             print("First round of unit propagation")
         self.dpll_prober.unit_prop(0, 0)
-        print("Aashna - 3")
 
     def clauses_with_literal(self, int literal):
         """
@@ -87,16 +83,13 @@ cdef class SATInstance:
         :return:
         """
         if literal > 0:
-            print("Aashna - 4")
             return self.clauses_with_positive_var[literal]
         else:
-            print("Aashna - 4")
             return self.clauses_with_negative_var[abs(literal)]
 
     def parse_active_features(self):
         # self.num_active_vars, self.num_active_clauses, self.clause_states, self.clauses, self.num_bin_clauses_with_var, self.var_states =\
         active_features.get_active_features(self, self.clauses, self.c, self.v)
-        print("Aashna - 5")
 
     def gen_basic_features(self):
 
@@ -109,7 +102,6 @@ cdef class SATInstance:
         base_features_dict = base_features.compute_base_features(self.preprocess, self.clauses, self.c, self.v, self.num_active_vars,
                                                                     self.num_active_clauses)
         self.features_dict.update(base_features_dict)
-        print("Aashna - 6")
 
     def gen_dpll_probing_features(self):
         """
@@ -124,7 +116,6 @@ cdef class SATInstance:
 
         self.features_dict.update(self.dpll_prober.unit_props_log_nodes_dict)
         self.features_dict.update(self.dpll_prober.search_space_measures_dict)
-        print("Aashna - 7")
 
     def gen_local_search_probing_features(self):
         """
@@ -138,7 +129,6 @@ cdef class SATInstance:
 
         self.features_dict.update(saps_res_dict)
         self.features_dict.update(gsat_res_dict)
-        print("Aashna - 8")
 
     def gen_ansotegui_features(self):
         if self.verbose:
@@ -152,7 +142,6 @@ cdef class SATInstance:
         alpha = graph_features_ansotegui.estimate_power_law_alpha(self.clauses, self.num_active_clauses,
                                                                     self.num_active_vars)
 
-        print("Aashna - 9")
         vig = graph_features_ansotegui.create_vig(self.clauses, self.num_active_clauses, self.num_active_vars)
         cvig = graph_features_ansotegui.create_cvig(self.clauses, self.num_active_clauses, self.num_active_vars)
 
@@ -190,7 +179,6 @@ cdef class SATInstance:
         nd, w = graph_features_manthey_alfonso.create_vg(self.clauses)
         all_stats.append(graph_features_manthey_alfonso.get_graph_stats("vg_al_", nd, w))
 
-        print("Aashna - 11")
         nd, w = graph_features_manthey_alfonso.create_cg(self.clauses)
         all_stats.append(graph_features_manthey_alfonso.get_graph_stats("cg_al_", nd, w))
 
@@ -208,7 +196,6 @@ cdef class SATInstance:
         nd, w = graph_features_manthey_alfonso.get_degrees_weights(bandg)
         all_stats.append(graph_features_manthey_alfonso.get_graph_stats("band_", nd, w))
 
-        print("Aashna - 12")
         nd, w = graph_features_manthey_alfonso.get_degrees_weights(exog)
         all_stats.append(graph_features_manthey_alfonso.get_graph_stats("exo_", nd, w))
 
@@ -220,4 +207,3 @@ cdef class SATInstance:
 
     def write_results(self):
         write_to_file.write_features_to_json(self.features_dict)
-        print("Aashna - 13")

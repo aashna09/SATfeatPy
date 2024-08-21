@@ -316,6 +316,11 @@ cpdef dict recursive_weight_heuristic(int max_clause_size, list clauses, int v):
                 curr_lit = clause[j]
                 comp_ind = 0 if curr_lit < 0 else 1
 
+                # Converting negative index values which work in python but not in cython
+                if curr_lit < 0:
+                    curr_lit = len(last_data[comp_ind]) + curr_lit
+
+                # tilde is complement
                 if last_data[comp_ind][curr_lit] == 0:
                     found_zero = True
                     break
@@ -329,6 +334,10 @@ cpdef dict recursive_weight_heuristic(int max_clause_size, list clauses, int v):
                 for j in range(clause_len):
                     curr_lit = clause[j]
                     comp_ind = 0 if curr_lit < 0 else 1
+
+                    # Converting negative index values which work in python but not in cython
+                    if curr_lit < 0:
+                        curr_lit = len(last_data[comp_ind]) + curr_lit
 
                     this_data[comp_ind][curr_lit] += clause_value / last_data[comp_ind][curr_lit]
 

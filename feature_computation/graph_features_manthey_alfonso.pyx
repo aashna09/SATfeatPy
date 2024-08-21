@@ -1,8 +1,8 @@
 # cython: language_level=3
 import cython
 import numpy as np
+cimport numpy as np
 from scipy import stats
-cimport numpy as cnp
 from libc.stdlib cimport malloc, free
 
 # Import NetworkX as a Python module since it cannot be compiled by Cython
@@ -43,21 +43,22 @@ cpdef tuple create_vcg(list clauses):
     cdef list v_node_degrees_neg = []
     cdef list c_node_degrees_pos = []
     cdef list c_node_degrees_neg = []
+    cdef str node
 
     # get node statistics
-    for i in vcgpos.nodes():
-        if 'c' in i:
-            degree = len(nx.edges(vcgpos, i))
+    for node in vcgpos.nodes():
+        if 'c' in node:
+            degree = len(nx.edges(vcgpos, node))
             c_node_degrees_pos.append(degree)
-        elif 'v' in i:
-            degree = len(nx.edges(vcgpos, i))
+        elif 'v' in node:
+            degree = len(nx.edges(vcgpos, node))
             v_node_degrees_pos.append(degree)
-    for i in vcgneg.nodes():
-        if 'c' in i:
-            degree = len(nx.edges(vcgneg, i))
+    for node in vcgneg.nodes():
+        if 'c' in node:
+            degree = len(nx.edges(vcgneg, node))
             c_node_degrees_neg.append(degree)
-        elif 'v' in i:
-            degree = len(nx.edges(vcgneg, i))
+        elif 'v' in node:
+            degree = len(nx.edges(vcgneg, node))
             v_node_degrees_neg.append(degree)
 
     return v_node_degrees_pos, v_node_degrees_neg, c_node_degrees_pos, c_node_degrees_neg
@@ -219,7 +220,7 @@ cpdef tuple create_big(list clauses):
 @cython.wraparound(False)
 cpdef neighbors_nodes(int l, list clauses):
     big, _, _ = create_big(clauses)
-    cdef list neighbors = big.neighbors('v_' + str(l))
+    cdef list neighbors =list(big.neighbors('v_' + str(l)))
     return neighbors
 
 @cython.boundscheck(False)
@@ -326,7 +327,8 @@ cpdef dict get_graph_stats(str name, list node_degrees, list weights=[]):
     """
     cdef double node_min, node_max, node_mode, node_mean, node_std, node_zeros, node_entropy, node_val_rate
     cdef double weights_min, weights_max, weights_mode, weights_mean, weights_std, weights_zeros, weights_entropy, weights_val_rate
-    cdef list node_quantiles, weights_quantiles
+    cdef np.ndarray node_quantiles
+    cdef list weights_quantiles
     cdef list node_stats, weights_stats
     cdef list deg_names, weights_names
     cdef dict stats_dict

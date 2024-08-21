@@ -38,7 +38,7 @@ def get_active_features(sat_instance, clauses, int c, int v):
     clause_states = [ClauseState.PASSIVE] * c
     cdef long[:] num_active_clauses_with_var = np.empty(v+1, dtype=np.long)
     cdef long[:] num_bin_clauses_with_var = np.empty(v+1, dtype=np.long)
-    cdef long[:] clause_lengths = np.empty(v+1, dtype=np.long)
+    cdef long[:] clause_lengths = np.empty(c, dtype=np.long)
 
     unit_clauses = []
 
