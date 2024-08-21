@@ -117,7 +117,7 @@ def get_active_features(sat_instance, clauses, int c, int v):
 
     # Now remove the redundant variables
     cdef int num_active_vars = v
-    cdef double[:] var_states = np.empty(v+1, dtype=np.double)
+    cdef list var_states = [VarState.UNASSIGNED] * (v+1)
 
     var_states[0] = VarState.IRRELEVANT
 

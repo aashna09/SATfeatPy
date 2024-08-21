@@ -14,16 +14,16 @@ def compute_balance_features(list clauses, int c, int v):
     :param v: number of variables
     :return:
     """
-    cdef int[:] variables_pos_count = array.array('i', [0] * v)
-    cdef int[:] variables_neg_count = array.array('i', [0] * v)
-    cdef double[:] pos_neg_variable_ratios = array.array('d', [])
-    cdef double[:] pos_neg_variable_balance = array.array('d', [])
-    cdef double[:] pos_neg_clause_ratios = array.array('d', [])
-    cdef double[:] pos_neg_clause_balance = array.array('d', [])
+    cdef list variables_pos_count = [0] * v
+    cdef list variables_neg_count = [0] * v
+    cdef list pos_neg_variable_ratios = []
+    cdef list pos_neg_variable_balance = []
+    cdef list pos_neg_clause_ratios = []
+    cdef list pos_neg_clause_balance = []
     cdef int num_horn_clauses = 0
     cdef int num_binary_clauses = 0
     cdef int num_ternary_clauses = 0
-    cdef int[:] horn_clause_variable_count = array.array('i', [0] * v)
+    cdef list horn_clause_variable_count = [0] * v
     
     cdef int pos, neg, literal, i
     cdef double ratio

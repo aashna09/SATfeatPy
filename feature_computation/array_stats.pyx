@@ -63,7 +63,7 @@ def scipy_entropy_discrete(list l, int num_outcomes):
     :param num_outcomes: The total possible number of outcomes
     :return: Entropy of l
     """
-    cdef np.ndarray[int, ndim=1] p = np.zeros(num_outcomes, dtype=np.int32)
+    cdef np.ndarray[np.float64_t, ndim=1] p = np.zeros(num_outcomes, dtype=np.float64)
     cdef int elem
     cdef double entropy
 
@@ -83,7 +83,7 @@ def scipy_entropy_continous(list l, int buckets=100):
     :param l: Data
     :return: Entropy of l
     """
-    cdef np.ndarray[int, ndim=1] p = np.zeros(buckets, dtype=np.int32)
+    cdef np.ndarray[np.float64_t, ndim=1] p = np.zeros(buckets, dtype=np.float64)
     cdef int index, x
     cdef double entropy
     cdef double maxval = 1.0
@@ -116,7 +116,7 @@ def entropy_float_array(list l, int num, int vals, double maxval):
     writeFeature("POSNEG-RATIO-CLAUSE-entropy",array_entropy(pos_frac_in_clause,numClauses,100,1));
     https://en.wikipedia.org/wiki/Entropy_(information_theory)
     """
-    cdef np.ndarray[int, ndim=1] p = np.zeros(vals + 1, dtype=np.int32)
+    cdef np.ndarray[np.float64_t, ndim=1] p = np.zeros(vals + 1, dtype=np.float64)
     cdef double entropy = 0.0
     cdef int index, t
 
@@ -147,7 +147,7 @@ def entropy_int_array(list l, int number_of_outcomes):
     vcg clause entropy = array_entropy(clause_array,numClauses,numActiveVars+1))
     Entropy of x  is H(X) = - sum (P(xi) * log(P(xi)))
     """
-    cdef np.ndarray[int, ndim=1] p = np.zeros(number_of_outcomes, dtype=np.int32)
+    cdef np.ndarray[np.float64_t, ndim=1] p = np.zeros(number_of_outcomes, dtype=np.float64)
     cdef double entropy = 0.0
     cdef int elem, t
 

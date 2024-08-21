@@ -4,11 +4,9 @@ cimport cython
 from libc.time cimport clock, CLOCKS_PER_SEC
 
 cdef class Stopwatch:
-    cdef double start_time
-
-    cdef start(self):
+    def start(self):
         self.start_time = clock()
 
-    cdef lap(self):
+    def lap(self):
         cdef double c_time = clock()
         return (c_time - self.start_time) / CLOCKS_PER_SEC

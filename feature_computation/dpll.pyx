@@ -5,18 +5,11 @@ import random
 cimport cython
 import statistics
 from feature_computation.enums cimport VarState, ClauseState
-# from feature_computation.stopwatch cimport Stopwatch
+from feature_computation.stopwatch cimport Stopwatch
+from sat_instance.sat_instance cimport SATInstance
 from libc.time cimport clock, CLOCKS_PER_SEC
-
-cdef class Stopwatch:
-    cdef double start_time
-
-    def start(self):
-        self.start_time = clock()
-
-    def lap(self):
-        cdef double c_time = clock()
-        return (c_time - self.start_time) / CLOCKS_PER_SEC
+import numpy as np
+cimport numpy as np
 
 
 cdef class DPLLProbing:
@@ -45,7 +38,6 @@ cdef class DPLLProbing:
     Code adapted from SATzilla implementation
 
     """
-
     def __init__(self, sat_instance):
         self.sat_instance = sat_instance
         self.verbose = sat_instance.verbose
@@ -66,8 +58,11 @@ cdef class DPLLProbing:
         self.reduced_clauses = []
         self.unit_props_log_nodes_dict = {}
         self.search_space_measures_dict = {}
+        self.left_subtree_size = []
+        cdef int i
 
-        self.left_subtree_size = [0] * (self.sat_instance.v + 1)
+        for i in range(self.sat_instance.v + 1):
+            self.left_subtree_size.append(0)
         self.branch_lengths = []
         self.branch_probabilities = []
         self.depths_knuth = []
@@ -81,7 +76,7 @@ cdef class DPLLProbing:
 
 # this should change as the propagation happens
 
-    cpdef search_space_probe(self, bint halt_on_assignment=False):
+    def search_space_probe(self, bint halt_on_assignment=False):
         """
         Randomly choose a variable, propagate, and see how deep you get. This generates the mean depth to contradiction
         and an estimate on the number of nodes.
@@ -180,7 +175,7 @@ cdef class DPLLProbing:
         if self.verbose:
             print("total time:", sw.lap())
 
-    cpdef unit_propagation_probe(self, bint haltOnAssignment=False):
+    def unit_propagation_probe(self, bint haltOnAssignment=False):
         """
         Method to calculate the dpll probing features
         """
@@ -292,7 +287,7 @@ cdef class DPLLProbing:
         while self.sat_instance.num_active_vars != orig_num_active_vars:
             self.backtrack()
 
-    cpdef combined_probing(self):
+    def combined_probing(self):
         self.start_probing()
         self.reset_estimators_data()
 
@@ -309,20 +304,23 @@ cdef class DPLLProbing:
         self.search_space_measures_dict["weighted_backtrack_estimate"] = weighted_backtrack_estimate
         self.search_space_measures_dict["recursive_estimate"] = recursive_estimate
 
-    cpdef reset_estimators_data(self):
-        self.left_subtree_size = [0] * (self.sat_instance.v + 1)
+    def reset_estimators_data(self):
+        self.left_subtree_size = []
+        cdef int i
+        for i in range(self.sat_instance.v + 1):
+            self.left_subtree_size.append(0)
         self.branch_lengths = []
         self.branch_probabilities = []
         self.depths_knuth = []
 
-    cpdef update_estimators_data(self):
+    def update_estimators_data(self):
         cdef int current_depth = len(self.reduced_vars)
         self.left_subtree_size[current_depth - 1 if current_depth > 0 else 0] += 1
         self.branch_lengths.append(current_depth)
         self.branch_probabilities.append(2 ** -current_depth)
         self.depths_knuth.append(current_depth)
 
-    cpdef bint make_decision_and_propagate(self):
+    def make_decision_and_propagate(self):
         cdef int var = self.select_unassigned_variable()
         cdef bint success
         if var is None:
@@ -334,14 +332,14 @@ cdef class DPLLProbing:
             self.update_estimators_data()
         return success
 
-    cpdef select_unassigned_variable(self):
+    def select_unassigned_variable(self):
         cdef int var
         for var in range(1, self.sat_instance.v + 1):
             if self.sat_instance.var_states[var] == VarState.UNASSIGNED:
                 return var
         return None
 
-    cpdef double calculate_weighted_backtrack_estimate(self):
+    def calculate_weighted_backtrack_estimate(self):
         if not self.branch_lengths:
             return 0.0
 
@@ -364,7 +362,7 @@ cdef class DPLLProbing:
 
         return log_weighted_backtrack_estimate
 
-    cpdef double estimate_branching_factor_reduction(self, int depth):
+    def estimate_branching_factor_reduction(self, int depth):
         cdef double base_activity = 1.0
         cdef double decay_factor = 0.95
         cdef double adjusted_activity = base_activity * (decay_factor ** depth)
@@ -372,7 +370,7 @@ cdef class DPLLProbing:
 
         return reduction
 
-    cpdef double estimate_tree_size(self, int depth, double branching_factor=2):
+    def estimate_tree_size(self, int depth, double branching_factor=2):
         if depth >= self.sat_instance.v:
             return 0.0
 
@@ -385,7 +383,7 @@ cdef class DPLLProbing:
         
         return log_tree_size / self.sat_instance.v
 
-    cpdef double calculate_knuths_estimate(self):
+    def calculate_knuths_estimate(self):
         if not self.depths_knuth:
             return 0.0
 
@@ -395,10 +393,10 @@ cdef class DPLLProbing:
 
         return normalized_log_knuths_estimate
 
-    cpdef start_probing(self):
+    def start_probing(self):
         self.probing_stopwatch.start()
 
-    cpdef bint set_var_and_prop(self, int var, bint value):
+    def set_var_and_prop(self, int var, bint value):
         cdef int num_clauses_reduced = 0
         cdef int num_vars_reduced = 1
         cdef int literal
@@ -426,13 +424,14 @@ cdef class DPLLProbing:
 
         return consistent
 
-    cpdef bint reduce_clauses(self, int orig_literal, int num_clauses_reduced, int num_vars_reduced):
+    def reduce_clauses(self, int orig_literal, int num_clauses_reduced, int num_vars_reduced):
         cdef int clause_num, literal, curr_var, i, j
 
         for clause_num in self.sat_instance.clauses_with_literal(-orig_literal):
             if self.sat_instance.clause_states[clause_num] == ClauseState.ACTIVE:
                 self.reduced_clauses.append(clause_num)
                 num_clauses_reduced += 1
+                print(f"len(self.sat_instance.clause_lengths): {self.sat_instance.clause_lengths} and clause_num: {clause_num}")
                 self.sat_instance.clause_lengths[clause_num] -= 1
 
                 if self.sat_instance.clause_lengths[clause_num] == 2:
@@ -471,7 +470,7 @@ cdef class DPLLProbing:
 
         return True, num_clauses_reduced, num_vars_reduced
 
-    cpdef unit_prop(self, int num_clauses_reduced, int num_vars_reduced):
+    def unit_prop(self, int num_clauses_reduced, int num_vars_reduced):
         cdef bint consistent = True
         cdef int clause_number, lit_num, literal
         cdef bint r_consistent
@@ -503,7 +502,7 @@ cdef class DPLLProbing:
 
         return consistent, num_clauses_reduced, num_vars_reduced
 
-    cpdef void backtrack(self):
+    def backtrack(self):
         """
         Should undo one call of setVar or unitprop
         :return:
