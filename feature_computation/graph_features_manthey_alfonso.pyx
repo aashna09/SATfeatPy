@@ -346,7 +346,7 @@ cpdef dict get_graph_stats(str name, list node_degrees, list weights=[]):
     node_zeros = np.count_nonzero(node_degrees == 0)
     node_entropy = stats.entropy(node_degrees)
     node_quantiles = stats.mstats.mquantiles(node_degrees)
-    node_val_rate = np.count_nonzero(node_degrees == node_mode) / len(node_degrees)
+    node_val_rate = (np.count_nonzero(node_degrees == node_mode)*1.0) / (len(node_degrees)*1.0)
     node_stats = [node_min, node_max, node_mode, node_mean, node_std, node_zeros, node_entropy, node_quantiles[0],
                   node_quantiles[1], node_quantiles[2], node_val_rate]
 
@@ -357,7 +357,7 @@ cpdef dict get_graph_stats(str name, list node_degrees, list weights=[]):
     weights_std = np.std(weights)
     weights_zeros = np.count_nonzero(weights == 0)
     weights_entropy = stats.entropy(weights)
-    weights_quantiles = stats.mstats.mquantiles(weights)
+    weights_quantiles = stats.mstats.mquantiles(weights).tolist()
     weights_val_rate = np.count_nonzero(weights == weights_mode) / len(weights)
     weights_stats = [weights_min, weights_max, weights_mode, weights_mean, weights_std, weights_zeros, weights_entropy,
                      weights_quantiles[0], weights_quantiles[1], weights_quantiles[2], weights_val_rate]
