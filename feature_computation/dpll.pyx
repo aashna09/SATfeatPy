@@ -321,7 +321,7 @@ cdef class DPLLProbing:
         self.depths_knuth.append(current_depth)
 
     def make_decision_and_propagate(self):
-        cdef int var = self.select_unassigned_variable()
+        var = self.select_unassigned_variable()
         cdef bint success
         if var is None:
             return True  # No unassigned variables left

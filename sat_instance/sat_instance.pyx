@@ -160,7 +160,6 @@ cdef class SATInstance:
             "variable_alpha": alpha
         }
 
-        print("Aashna - 10")
         self.features_dict.update(ansotegui_features)
 
     def gen_manthey_alfonso_graph_features(self):
